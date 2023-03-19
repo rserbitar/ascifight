@@ -2,6 +2,15 @@ from fastapi import FastAPI
 from pydantic import BaseModel, validator, ValidationError, Field
 from collections import defaultdict
 from typing import TypeVar, cast
+import structlog
+from structlog.contextvars import (
+    bind_contextvars,
+    bound_contextvars,
+    clear_contextvars,
+    merge_contextvars,
+    unbind_contextvars,
+)
+
 import asyncio
 import itertools
 import enum
@@ -10,11 +19,13 @@ import os
 import random
 import abc
 
+logger = structlog.get_logger()
+
 T = TypeVar("T")
 
 MAPSIZE = 15
 WAIT_TIME = 5
-ACTORNUM = 1
+ACTORNUM = 3
 SENTINEL = object()
 
 app = FastAPI()
@@ -218,13 +229,14 @@ class Board:
             if target_coordinates not in forbidden_positions:
                 actor.flag = None
                 self.put_actor(actor, target_coordinates)
+                logger.info(f"Actor {actor.player.name}-{actor.ident} respawned to coordinates {target_coordinates}")
                 break
 
     def calc_target_coordinates(
         self, actor: Actor, direction: Directions
     ) -> Coordinates:
         coordinates = self.actors_coordinates[actor]
-        new_coordinates = copy.copy(coordinates)
+        new_coordinates = Coordinates(x=coordinates.x, y=coordinates.y)
         if direction == direction.right:
             new_coordinates.x = min(coordinates.x + 1, self.mapsize - 1)
         if direction == direction.left:
@@ -233,7 +245,7 @@ class Board:
             new_coordinates.y = min(coordinates.y + 1, self.mapsize - 1)
         if direction == direction.down:
             new_coordinates.y = max(coordinates.y - 1, 0)
-        return coordinates
+        return new_coordinates
 
     def move(self, actor: Actor, direction: Directions) -> bool:
         new_coordinates = self.calc_target_coordinates(actor, direction)
@@ -248,10 +260,12 @@ class Board:
             or self.coordinates_bases.get(new_coordinates)
             or new_coordinates in self.walls_coordinates
         ):
+            logger.info(f"Actor {actor.player.name}-{actor.ident} did not move. Target field is occupied.")
             return False
 
         # check if position has changed:
         if new_coordinates == coordinates:
+            logger.info(f"Actor {actor.player.name}-{actor.ident} did not move. Board boundaries int he way.")
             return False
 
         self.actors_coordinates[actor] = new_coordinates
@@ -260,11 +274,11 @@ class Board:
             flag = actor.flag
             self.flags_coordinates[flag] = new_coordinates
 
+        logger.info(f"Actor {actor.player.name}-{actor.ident} moved from {coordinates} to {new_coordinates}")
         return True
 
     def image(self) -> str:
         field = [["___" for _ in range(self.mapsize)] for _ in range(self.mapsize)]
-        flag_coordinates = set(self.flags_coordinates.values())
 
         for i, base in enumerate(self.bases_coordinates.values()):
             field[base.y][base.x] = f" {colors[i]}\u25D9{colors[99]} "
@@ -273,7 +287,6 @@ class Board:
             color = colors[actor.player.number]
             field[coordinates.y][coordinates.x] = f" {color}{char}{colors[99]} "
         for flag, coordinates in self.flags_coordinates.items():
-            print(flag)
             color = colors[flag]
             before = field[coordinates.y][coordinates.x]
             field[coordinates.y][coordinates.x] = (
@@ -289,18 +302,15 @@ class Board:
         return joined
 
     def place_bases(self, players: int) -> None:
-        taken: list[Coordinates] = []
-        placed = 0
         available_places = list(range(len(base_place_matrix)))
-        while placed < players:
+        for i in range(players):
             place_chosen = random.choice(available_places)
             available_places.remove(place_chosen)
             x = random.randint(*base_place_matrix[place_chosen][0])
             y = random.randint(*base_place_matrix[place_chosen][1])
             coordinates = Coordinates(x=x, y=y)
-            self.bases_coordinates[placed] = coordinates
-            self.flags_coordinates[placed] = coordinates
-            placed += 1
+            self.bases_coordinates[i] = coordinates
+            self.flags_coordinates[i] = coordinates
 
     def reserve_space(self, taken, coordinates):
         for x in range(coordinates.x - 2, coordinates.x + 3):
@@ -394,7 +404,7 @@ class Game:
 
     def execute_gamestep(self, orders: list[Order]) -> None:
         self.tick += 1
-
+        
         move_orders: list[MoveOrder] = []
         attack_orders: list[AttackOrder] = []
         grabput_orders: list[GrabPutOrder] = []
@@ -408,8 +418,13 @@ class Game:
                 elif isinstance(order, GrabPutOrder):
                     grabput_orders.append(order)
 
+        logger.info("Executing move orders.")
         self.execute_move_orders(move_orders)
+
+        logger.info("Executing grab/put orders.")
         self.execute_grabput_orders(grabput_orders)
+
+        logger.info("Executing attack orders.")
         self.execute_attack_orders(attack_orders)
 
     def execute_move_orders(self, move_orders: list[MoveOrder]) -> None:
@@ -428,7 +443,7 @@ class Game:
         for order in attack_orders:
             actor = self.players_actors[(self.players[order.name], order.actor)]
 
-            # if the actor can not grab or the attack missed or it aldready attacked
+            # if the actor can not attack or the attack missed or it aldready attacked
             if (attack_roll := random.random() < actor.attack) and (
                 not already_attacked[actor]
             ):
@@ -438,12 +453,12 @@ class Game:
                 )
                 target = self.board.coordinates_actors.get(target_coordinates)
                 if target is not None:
+                    logger.info(f"Actor {actor.player.name}-{actor.ident} attacked and hit actor {target.player.name}-{target.ident}.")
                     self.board.respawn(target)
-                already_attacked[actor] = True
+                    already_attacked[actor] = True
 
-            # no attack happened
             else:
-                pass
+                logger.info(f"Actor {actor.player.name}-{actor.ident} did not attack. Actor can not attack or missed.")
 
     def execute_grabput_orders(self, grabput_orders: list[GrabPutOrder]):
         already_grabbed = self.actor_dict(False)
@@ -467,11 +482,13 @@ class Game:
 
             # if there is a target that already has a flag or can not carry it do nothing
             if target_actor is not None and (
-                not target_actor.grab or target_actor.flag is None
+                not target_actor.grab or target_actor.flag is not None
             ):
+                logger.info(f"Actor {actor.player.name}-{actor.ident} can not hand the flag to actor {target_actor.player.name}-{target_actor.ident}.")
                 already_grabbed = False
             # if the target coordinates are a wall
             elif target_coordinates in self.board.walls_coordinates:
+                logger.info(f"Actor {actor.player.name}-{actor.ident} can not hand the flag to a wall.")
                 already_grabbed = False
 
             # otherwise put the flag there
@@ -482,10 +499,12 @@ class Game:
                 # and assign it to the target if there is one
                 if target_actor is not None:
                     target_actor.flag = flag
+                    logger.info(f"Actor {actor.player.name}-{actor.ident} handed the flag to actor {target_actor.player.name}-{target_actor.ident}.")
                     self.check_flag_return_conditions(actor)
 
                 # the flag was put ont he field (maybe a base)
                 else:
+                    logger.info(f"Actor {actor.player.name}-{actor.ident} putthe flag to coordinates {target_coordinates}.")
                     self.check_score_conditions(flag, target_coordinates)
 
         # the actor does not have the flag
@@ -522,13 +541,6 @@ class Game:
                 self.board.flags_coordinates[flag] = self.board.bases_coordinates[flag]
 
 
-game = Game(
-    Board(mapsize=MAPSIZE, walls=10),
-    max_players=3,
-    actors=InitialActorsList(actors=[Runner]),
-)
-
-
 @app.post("/command")
 async def command(order: MoveOrder | AttackOrder | GrabPutOrder):
     command_queue.put_nowait(order)
@@ -548,29 +560,46 @@ async def register(order: RegisterOrder):
 @app.get("/state")
 async def get_state():
     pass
+    # TODO: think about serialization
     # return StateResponse(
     #     actors_coordinates=game.board.actors_coordinates,
     #     players=list(game.players.keys()),
     #     time_of_next_execution=game.time_of_next_execution,
     # )
 
+game = Game(
+    Board(mapsize=MAPSIZE, walls=10),
+    max_players=3,
+    actors=InitialActorsList(actors=[Runner, Attacker, Attacker]),
+)
 
 async def routine():
     waiting_seconds = 0
-    max_wait = 3
+    max_wait = 10
+
+    await logger.ainfo("Starting registration.")
     while (len(game.players) < game.max_players) and (waiting_seconds <= max_wait):
         waiting_seconds += 1
         await asyncio.sleep(1)
+
+    await logger.ainfo("Initiating game.")
     game.initiate_game()
+
     while True:
         await command_queue.put(SENTINEL)
         commands = await get_all_queue_items(command_queue)
+
         os.system("cls" if os.name == "nt" else "clear")
         print(game.board.image())
-        print(commands)
+
+        bind_contextvars(tick=game.tick)
+
+        await logger.ainfo("Starting tick execution.")
         game.execute_gamestep(commands)
+
+        await logger.ainfo("Waiting for game commands.")
         game.time_of_next_execution = asyncio.get_running_loop().time() + WAIT_TIME
-        print(f"tick {game.tick}")
+
         await asyncio.sleep(WAIT_TIME)
 
 
