@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from pydantic import BaseModel, validator, ValidationError, Field
+from pydantic import BaseModel, validator, ValidationError, Field, root_validator
 from collections import defaultdict
 from typing import TypeVar, cast
 import frozendict
@@ -24,7 +24,7 @@ logger = structlog.get_logger()
 
 T = TypeVar("T")
 
-MAPSIZE = 15
+map_size = 15
 WAIT_TIME = 5
 ACTORNUM = 3
 SENTINEL = object()
@@ -47,9 +47,9 @@ colors = {
 
 base_place_matrix = [
     [[1, 4], [1, 4]],
-    [[1, 4], [MAPSIZE - 5, MAPSIZE - 2]],
-    [[MAPSIZE - 5, MAPSIZE - 2], [1, 4]],
-    [[MAPSIZE - 5, MAPSIZE - 2], [MAPSIZE - 5, MAPSIZE - 2]],
+    [[1, 4], [map_size - 5, map_size - 2]],
+    [[map_size - 5, map_size - 2], [1, 4]],
+    [[map_size - 5, map_size - 2], [map_size - 5, map_size - 2]],
 ]
 
 
@@ -71,12 +71,12 @@ class Coordinates(BaseModel):
     x: int = Field(
         description="X coodinate is decreased by the 'left' and increased by the 'right' direction.",
         ge=0,
-        le=MAPSIZE - 1,
+        le=map_size - 1,
     )
     y: int = Field(
         description="Y coodinate is decreased by the 'down' and increased by the 'up' direction.",
         ge=0,
-        le=MAPSIZE - 1,
+        le=map_size - 1,
     )
 
     def __eq__(self, another):
@@ -89,13 +89,6 @@ class Coordinates(BaseModel):
 
     def __hash__(self):
         return hash((self.x, self.y))
-
-    # shitty stuff the internet suggest because pydantic sucks in serialization
-    # https://github.com/pydantic/pydantic/issues/1090#issuecomment-1063984181
-    def dict(self, *args, **kwargs):
-        d = super().dict(*args, **kwargs)
-
-        return frozendict.frozendict(**d)
 
 
 class AttackOrder(Order):
@@ -143,7 +136,7 @@ class RegisterOrder(BaseModel):
     password: str
 
 
-class team(BaseModel):
+class Team(BaseModel):
     name: str
     password: str
     number: int
@@ -154,18 +147,11 @@ class team(BaseModel):
     def __hash__(self):
         return hash(self.name)
 
-    # shitty stuff the internet suggest because pydantic sucks in serialization
-    # https://github.com/pydantic/pydantic/issues/1090#issuecomment-1063984181
-    def dict(self, *args, **kwargs):
-        d = super().dict(*args, **kwargs)
-
-        return frozendict.frozendict(**d)
-
 
 class Actor(BaseModel, abc.ABC):
-    name: str = "default"
+    type = "Base"
     ident: int
-    team: team
+    team: Team
     grab = 0.0
     attack = 0.0
     flag: int | None = None
@@ -181,28 +167,25 @@ class Actor(BaseModel, abc.ABC):
     def __hash__(self):
         return hash((self.ident, self.team))
 
-    # shitty stuff the internet suggest because pydantic sucks in serialization
-    # https://github.com/pydantic/pydantic/issues/1090#issuecomment-1063984181
-    def dict(self, *args, **kwargs):
-        d = super().dict(*args, **kwargs)
-
-        return frozendict.frozendict(**d)
-
 
 class Generalist(Actor):
-    name = "Generalist"
+    type = "Generalist"
     grab = 1.0
     attack = 1.0
 
 
 class Runner(Actor):
-    name = "Runner"
+    type = "Runner"
     grab = 1.0
 
 
 class Attacker(Actor):
-    name = "Attacker"
+    type = "Attacker"
     attack = 1.0
+
+
+class Blocker(Actor):
+    type = "Blocker"
 
 
 class InitialActorsList(BaseModel):
@@ -238,15 +221,20 @@ class StateResponse(BaseModel):
     )
 
 
-class ActorProperties(BaseModel):
-    name: str
+class ActorProperty(BaseModel):
+    type: str
     grab: float
     attack: float
 
 
+class PropertiesResponse(BaseModel):
+    map_size = map_size
+    actor_types: list[ActorProperty]
+
+
 class Board:
-    def __init__(self, mapsize: int, walls=0) -> None:
-        self.mapsize = mapsize
+    def __init__(self, map_size: int, walls=0) -> None:
+        self.map_size = map_size
         self.walls = walls
 
         self.actors_coordinates: dict[Actor, Coordinates] = {}
@@ -311,11 +299,11 @@ class Board:
         coordinates = self.actors_coordinates[actor]
         new_coordinates = Coordinates(x=coordinates.x, y=coordinates.y)
         if direction == direction.right:
-            new_coordinates.x = min(coordinates.x + 1, self.mapsize - 1)
+            new_coordinates.x = min(coordinates.x + 1, self.map_size - 1)
         if direction == direction.left:
             new_coordinates.x = max(coordinates.x - 1, 0)
         if direction == direction.up:
-            new_coordinates.y = min(coordinates.y + 1, self.mapsize - 1)
+            new_coordinates.y = min(coordinates.y + 1, self.map_size - 1)
         if direction == direction.down:
             new_coordinates.y = max(coordinates.y - 1, 0)
         return new_coordinates
@@ -334,14 +322,7 @@ class Board:
             or new_coordinates in self.walls_coordinates
         ):
             logger.info(
-                f"Actor {actor.team.name}-{actor.ident} did not move. Target field is occupied."
-            )
-            return False
-
-        # check if position has changed:
-        if new_coordinates == coordinates:
-            logger.info(
-                f"Actor {actor.team.name}-{actor.ident} did not move. Board boundaries int he way."
+                f"Actor {actor.team.name}-{actor.ident} did not move. Target field is occupied or out of bounds."
             )
             return False
 
@@ -357,12 +338,12 @@ class Board:
         return True
 
     def image(self) -> str:
-        field = [["___" for _ in range(self.mapsize)] for _ in range(self.mapsize)]
+        field = [["___" for _ in range(self.map_size)] for _ in range(self.map_size)]
 
         for i, base in enumerate(self.bases_coordinates.values()):
             field[base.y][base.x] = f" {colors[i]}\u25D9{colors[99]} "
         for actor, coordinates in self.actors_coordinates.items():
-            char = actor.name[0].upper()
+            char = actor.type[0].upper()
             color = colors[actor.team.number]
             field[coordinates.y][coordinates.x] = f" {color}{char}{colors[99]} "
         for flag, coordinates in self.flags_coordinates.items():
@@ -420,8 +401,8 @@ class Board:
         walls = 0
         while walls < self.walls:
             coordinates = Coordinates(
-                x=random.randint(0, self.mapsize - 1),
-                y=random.randint(0, self.mapsize - 1),
+                x=random.randint(0, self.map_size - 1),
+                y=random.randint(0, self.map_size - 1),
             )
             if coordinates not in forbidden_postions:
                 self.walls_coordinates.add(coordinates)
@@ -434,8 +415,8 @@ class Game:
         self.actors = actors.actors
         self.board = board
         self.teams: list[str] = []
-        self.names_teams: dict[str, team] = {}
-        self.teams_actors: dict[tuple[team, int], Actor] = {}
+        self.names_teams: dict[str, Team] = {}
+        self.teams_actors: dict[tuple[Team, int], Actor] = {}
         self.scores: dict[int, int] = {}
 
         self.time_of_next_execution = 0.0
@@ -657,7 +638,7 @@ async def register(order: RegisterOrder):
     if len(game.names_teams) >= game.max_teams:
         return {"message": "Maximum number of teams reached"}
     game.teams.append(order.name)
-    game.names_teams[order.name] = team(
+    game.names_teams[order.name] = Team(
         name=order.name, password=order.password, number=len(game.names_teams)
     )
     return {"message": "Successfully registered"}
@@ -665,6 +646,7 @@ async def register(order: RegisterOrder):
 
 @app.get("/state")
 async def get_state() -> StateResponse:
+    """Get the current state of the game including locations of all actors, flags, bases and walls."""
     return StateResponse(
         teams=game.teams,
         actors=[
@@ -684,11 +666,44 @@ async def get_state() -> StateResponse:
     )
 
 
+@app.get("/state")
+async def get_game_properties() -> PropertiesResponse:
+    """Get the current rules mostly actor properties."""
+    actor_types = [
+        ActorProperty(type=actor.type, grab=actor.grab, attack=actor.attack)
+        for actor in set(game.actors)
+    ]
+    return PropertiesResponse(map_size=game.board.map_size, actor_types=actor_types)
+
+
 game = Game(
-    Board(mapsize=MAPSIZE, walls=10),
+    Board(map_size=map_size, walls=0),
     max_teams=3,
-    actors=InitialActorsList(actors=[Runner, Attacker, Attacker]),
+    actors=InitialActorsList(actors=[Runner]),
 )
+# game = Game(
+#     Board(map_size=map_size, walls=0),
+#     max_teams=3,
+#     actors=InitialActorsList(actors=[Generalist, Generalist, Generalist]),
+# )
+
+# game = Game(
+#     Board(map_size=map_size, walls=0),
+#     max_teams=3,
+#     actors=InitialActorsList(actors=[Runner, Attacker, Attacker]),
+# )
+
+# game = Game(
+#     Board(map_size=map_size, walls=10),
+#     max_teams=3,
+#     actors=InitialActorsList(actors=[Runner, Attacker, Attacker]),
+# )
+
+# game = Game(
+#     Board(map_size=map_size, walls=10),
+#     max_teams=3,
+#     actors=InitialActorsList(actors=[Runner, Attacker, Attacker, Blocker, Blocker]),
+# )
 
 
 async def routine():
@@ -748,9 +763,13 @@ async def ai_generator():
     await register(RegisterOrder(name="Bubi", password="Wubi"))
     await register(RegisterOrder(name="Trubi", password="Fubi"))
     while True:
-        await asyncio.sleep(10)
+        await asyncio.sleep(5)
         await command_queue.put(
-            MoveOrder(name="Schwubi", password="Dubi", actor=0, direction="up")
+            MoveOrder(name="Schwubi", password="Dubi", actor=0, direction="down")
+        )
+        await asyncio.sleep(5)
+        await command_queue.put(
+            MoveOrder(name="Schwubi", password="Dubi", actor=0, direction="right")
         )
 
 
