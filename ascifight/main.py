@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel, validator, ValidationError, Field
 from collections import defaultdict
 from typing import TypeVar, cast
+import frozendict
 import structlog
 from structlog.contextvars import (
     bind_contextvars,
@@ -32,11 +33,6 @@ app = FastAPI()
 command_queue = asyncio.Queue()
 
 
-class MyBaseModel(BaseModel):
-    def __hash__(self):
-        return hash((type(self),) + tuple(self.__dict__.values()))
-
-
 colors = {
     0: "\u001b[31m",
     1: "\u001b[32m",
@@ -65,13 +61,13 @@ class Directions(str, enum.Enum):
 
 
 class Order(BaseModel):
-    name: str = Field(decription="Name of the player to issue the order.")
+    name: str = Field(decription="Name of the team to issue the order.")
     password: str = Field(
-        decscription="The password for the player used during registering."
+        decscription="The password for the team used during registering."
     )
 
 
-class Coordinates(MyBaseModel):
+class Coordinates(BaseModel):
     x: int = Field(
         description="X coodinate is decreased by the 'left' and increased by the 'right' direction.",
         ge=0,
@@ -83,35 +79,53 @@ class Coordinates(MyBaseModel):
         le=MAPSIZE - 1,
     )
 
+    def __eq__(self, another):
+        return (
+            hasattr(another, "x")
+            and self.x == another.x
+            and hasattr(another, "y")
+            and self.y == another.y
+        )
+
+    def __hash__(self):
+        return hash((self.x, self.y))
+
+    # shitty stuff the internet suggest because pydantic sucks in serialization
+    # https://github.com/pydantic/pydantic/issues/1090#issuecomment-1063984181
+    def dict(self, *args, **kwargs):
+        d = super().dict(*args, **kwargs)
+
+        return frozendict.frozendict(**d)
+
 
 class AttackOrder(Order):
     actor: int = Field(
-        title="Actor",
-        description="The id of the actor, specific to the player.",
+        description="The id of the actor, specific to the team.",
         ge=0,
         le=ACTORNUM - 1,
     )
     direction: Directions = Field(
         title="Direction",
-        description="The direction to attack from the position of the actor. Only actors with the attack property can attack.",
+        description="The direction to attack from the position of the actor.",
     )
 
 
 class MoveOrder(Order):
-    actor: int = Field(ge=0, le=ACTORNUM - 1)
+    actor: int = Field(
+        description="The id of the actor, specific to the team.",
+        ge=0,
+        le=ACTORNUM - 1,
+    )
     direction: Directions = Field(
         title="Direction",
-        description=(
-            "The direction to move to from the position of the actor. 'up' increases the y coordinate and 'right' increases the x coordinate. "
-            "Moving over your own flag return it to the base."
-        ),
+        description="The direction to move to from the position of the actor. 'up' increases the y coordinate and 'right' increases the x coordinate.",
     )
 
 
 class GrabPutOrder(Order):
     actor: int = Field(
         title="Actor",
-        description="The id of the actor, specific to the player.",
+        description="The id of the actor, specific to the team.",
         ge=0,
         le=ACTORNUM - 1,
     )
@@ -129,7 +143,7 @@ class RegisterOrder(BaseModel):
     password: str
 
 
-class Player(BaseModel):
+class team(BaseModel):
     name: str
     password: str
     number: int
@@ -140,16 +154,18 @@ class Player(BaseModel):
     def __hash__(self):
         return hash(self.name)
 
+    # shitty stuff the internet suggest because pydantic sucks in serialization
+    # https://github.com/pydantic/pydantic/issues/1090#issuecomment-1063984181
+    def dict(self, *args, **kwargs):
+        d = super().dict(*args, **kwargs)
 
-class States(str, enum.Enum):
-    alive = "alive"
-    stunned = "stunned"
+        return frozendict.frozendict(**d)
 
 
 class Actor(BaseModel, abc.ABC):
     name: str = "default"
     ident: int
-    player: Player
+    team: team
     grab = 0.0
     attack = 0.0
     flag: int | None = None
@@ -158,12 +174,19 @@ class Actor(BaseModel, abc.ABC):
         return (
             hasattr(another, "ident")
             and self.ident == another.ident
-            and hasattr(another, "player")
-            and self.player == another.player
+            and hasattr(another, "team")
+            and self.team == another.team
         )
 
     def __hash__(self):
-        return hash((self.ident, self.player))
+        return hash((self.ident, self.team))
+
+    # shitty stuff the internet suggest because pydantic sucks in serialization
+    # https://github.com/pydantic/pydantic/issues/1090#issuecomment-1063984181
+    def dict(self, *args, **kwargs):
+        d = super().dict(*args, **kwargs)
+
+        return frozendict.frozendict(**d)
 
 
 class Generalist(Actor):
@@ -186,11 +209,39 @@ class InitialActorsList(BaseModel):
     actors: list[type[Actor]] = Field(min_items=ACTORNUM, max_items=ACTORNUM)
 
 
+class ActorDescriptions(BaseModel):
+    team: str = Field(description="The name of the actor's team.")
+    type: str = Field(decription="The type of the actor determining its capabilities.")
+    ident: int = Field(description="The identity number specific to the team.")
+    coordinates: Coordinates
+
+
 class StateResponse(BaseModel):
-    actors_coordinates: dict[tuple[str, str, int], tuple[int, int]]
-    test: dict[Actor, Coordinates]
-    players: list[str]
-    time_of_next_execution: float
+    teams: list[str] = Field(description="A list of all teams in the game.")
+    actors: list[ActorDescriptions] = Field(
+        description="A list of all actors in the game."
+    )
+    flags: list[Coordinates] = Field(
+        description="A list of all flags in the game. The flags are orderd according to the teams they belong to."
+    )
+    bases: list[Coordinates] = Field(
+        description="A list of all bases in the game. The bases are orderd according to the teams they belong to."
+    )
+    walls: list[Coordinates] = Field(
+        description="A list of all walls in the game. Actors can not enter wall fields."
+    )
+    scores: list[int] = Field(
+        description="A list of the current scores. The scored are orderd according to the teams they belong to."
+    )
+    time_of_next_execution: float = Field(
+        description="The linux time of next execution."
+    )
+
+
+class ActorProperties(BaseModel):
+    name: str
+    grab: float
+    attack: float
 
 
 class Board:
@@ -216,20 +267,42 @@ class Board:
         return {v: k for k, v in self.bases_coordinates.items()}
 
     def respawn(self, actor: Actor) -> None:
-        base_coordinates = self.flags_coordinates[actor.player.number]
+        base_coordinates = self.flags_coordinates[actor.team.number]
         possible_spawn_points = []
         for x in range(base_coordinates.x - 2, base_coordinates.x + 3):
             for y in range(base_coordinates.y - 2, base_coordinates.y + 3):
-                possible_spawn_points.append(Coordinates(x=x, y=y))
+                try:
+                    possible_spawn_points.append(Coordinates(x=x, y=y))
+                # ignore impossible positions
+                except ValidationError:
+                    pass
         actor_positions = list(self.actors_coordinates.values())
         flag_positions = list(self.flags_coordinates.values())
-        forbidden_positions = set(flag_positions + actor_positions)
+        base_positions = list(self.bases_coordinates.values())
+        walls_positions = list(self.walls_coordinates)
+        forbidden_positions = set(
+            flag_positions + actor_positions + base_positions + walls_positions
+        )
+        self.place_actor_in_area(actor, possible_spawn_points, forbidden_positions)
+
+    def place_actor_in_area(
+        self,
+        actor: Actor,
+        possible_spawn_points: list[Coordinates],
+        forbidden_positions: set[Coordinates],
+    ) -> None:
         while True:
             target_coordinates = random.choice(possible_spawn_points)
             if target_coordinates not in forbidden_positions:
-                actor.flag = None
-                self.put_actor(actor, target_coordinates)
-                logger.info(f"Actor {actor.player.name}-{actor.ident} respawned to coordinates {target_coordinates}")
+                if actor.flag is not None:
+                    logger.info(
+                        f"Actor {actor.team.name}-{actor.ident} dropped flag {actor.flag}."
+                    )
+                    actor.flag = None
+                self.actors_coordinates[actor] = target_coordinates
+                logger.info(
+                    f"Actor {actor.team.name}-{actor.ident} respawned to coordinates {target_coordinates}."
+                )
                 break
 
     def calc_target_coordinates(
@@ -249,9 +322,9 @@ class Board:
 
     def move(self, actor: Actor, direction: Directions) -> bool:
         new_coordinates = self.calc_target_coordinates(actor, direction)
-        return self.put_actor(actor, new_coordinates)
+        return self.try_put_actor(actor, new_coordinates)
 
-    def put_actor(self, actor: Actor, new_coordinates: Coordinates) -> bool:
+    def try_put_actor(self, actor: Actor, new_coordinates: Coordinates) -> bool:
         coordinates = self.actors_coordinates[actor]
 
         # check if position is already inhabited by an actor or base or wall
@@ -260,12 +333,16 @@ class Board:
             or self.coordinates_bases.get(new_coordinates)
             or new_coordinates in self.walls_coordinates
         ):
-            logger.info(f"Actor {actor.player.name}-{actor.ident} did not move. Target field is occupied.")
+            logger.info(
+                f"Actor {actor.team.name}-{actor.ident} did not move. Target field is occupied."
+            )
             return False
 
         # check if position has changed:
         if new_coordinates == coordinates:
-            logger.info(f"Actor {actor.player.name}-{actor.ident} did not move. Board boundaries int he way.")
+            logger.info(
+                f"Actor {actor.team.name}-{actor.ident} did not move. Board boundaries int he way."
+            )
             return False
 
         self.actors_coordinates[actor] = new_coordinates
@@ -274,7 +351,9 @@ class Board:
             flag = actor.flag
             self.flags_coordinates[flag] = new_coordinates
 
-        logger.info(f"Actor {actor.player.name}-{actor.ident} moved from {coordinates} to {new_coordinates}")
+        logger.info(
+            f"Actor {actor.team.name}-{actor.ident} moved from {coordinates} to {new_coordinates}"
+        )
         return True
 
     def image(self) -> str:
@@ -284,7 +363,7 @@ class Board:
             field[base.y][base.x] = f" {colors[i]}\u25D9{colors[99]} "
         for actor, coordinates in self.actors_coordinates.items():
             char = actor.name[0].upper()
-            color = colors[actor.player.number]
+            color = colors[actor.team.number]
             field[coordinates.y][coordinates.x] = f" {color}{char}{colors[99]} "
         for flag, coordinates in self.flags_coordinates.items():
             color = colors[flag]
@@ -301,9 +380,9 @@ class Board:
         joined = "".join(list(itertools.chain.from_iterable(field)))
         return joined
 
-    def place_bases(self, players: int) -> None:
+    def place_bases(self, teams: int) -> None:
         available_places = list(range(len(base_place_matrix)))
-        for i in range(players):
+        for i in range(teams):
             place_chosen = random.choice(available_places)
             available_places.remove(place_chosen)
             x = random.randint(*base_place_matrix[place_chosen][0])
@@ -350,15 +429,13 @@ class Board:
 
 
 class Game:
-    def __init__(
-        self, board: Board, max_players: int, actors: InitialActorsList
-    ) -> None:
-        self.max_players = max_players
+    def __init__(self, board: Board, max_teams: int, actors: InitialActorsList) -> None:
+        self.max_teams = max_teams
         self.actors = actors.actors
         self.board = board
-
-        self.players: dict[str, Player] = {}
-        self.players_actors: dict[tuple[Player, int], Actor] = {}
+        self.teams: list[str] = []
+        self.names_teams: dict[str, team] = {}
+        self.teams_actors: dict[tuple[team, int], Actor] = {}
         self.scores: dict[int, int] = {}
 
         self.time_of_next_execution = 0.0
@@ -366,45 +443,43 @@ class Game:
 
     def initiate_game(self) -> None:
         self.set_scores()
-        self.create_player_actors()
+        self.create_team_actors()
         self.place_actors_and_bases()
 
     def set_scores(self) -> None:
-        for i in range(len(self.players)):
+        for i in range(len(self.names_teams)):
             self.scores[i] = 0
 
     def place_actors_and_bases(self) -> None:
-        self.board.place_bases(len(self.players))
-        for p, player in enumerate(self.players.values()):
+        self.board.place_bases(len(self.names_teams))
+        for p, team in enumerate(self.names_teams.values()):
             coordinates = self.board.bases_coordinates[p]
             actors = []
             for a in range(len(self.actors)):
-                actors.append(self.players_actors[(player, a)])
+                actors.append(self.teams_actors[(team, a)])
                 self.board.place_actors(actors, coordinates)
         self.board.place_walls()
 
-    def create_player_actors(self) -> None:
-        for player in self.players.values():
+    def create_team_actors(self) -> None:
+        for team in self.names_teams.values():
             for number, actor in enumerate(self.actors):
-                self.players_actors[(player, number)] = actor(
-                    ident=number, player=player
-                )
+                self.teams_actors[(team, number)] = actor(ident=number, team=team)
 
     def actor_dict(self, value: T) -> dict[Actor, T]:
         value_dict = {}
-        for actor in self.players_actors.values():
+        for actor in self.teams_actors.values():
             value_dict[actor] = value
         return value_dict
 
     def validate_order(self, order: Order) -> bool:
         check = False
-        if order.name in self.players.keys():
-            check = self.players[order.name].password == order.password
+        if order.name in self.names_teams.keys():
+            check = self.names_teams[order.name].password == order.password
         return check
 
     def execute_gamestep(self, orders: list[Order]) -> None:
         self.tick += 1
-        
+
         move_orders: list[MoveOrder] = []
         attack_orders: list[AttackOrder] = []
         grabput_orders: list[GrabPutOrder] = []
@@ -430,7 +505,7 @@ class Game:
     def execute_move_orders(self, move_orders: list[MoveOrder]) -> None:
         already_moved = self.actor_dict(False)
         for order in move_orders:
-            actor = self.players_actors[(self.players[order.name], order.actor)]
+            actor = self.teams_actors[(self.names_teams[order.name], order.actor)]
             direction = order.direction
             if not already_moved[actor]:
                 # if the actor can move
@@ -441,7 +516,7 @@ class Game:
     def execute_attack_orders(self, attack_orders: list[AttackOrder]) -> None:
         already_attacked = self.actor_dict(False)
         for order in attack_orders:
-            actor = self.players_actors[(self.players[order.name], order.actor)]
+            actor = self.teams_actors[(self.names_teams[order.name], order.actor)]
 
             # if the actor can not attack or the attack missed or it aldready attacked
             if (attack_roll := random.random() < actor.attack) and (
@@ -453,17 +528,21 @@ class Game:
                 )
                 target = self.board.coordinates_actors.get(target_coordinates)
                 if target is not None:
-                    logger.info(f"Actor {actor.player.name}-{actor.ident} attacked and hit actor {target.player.name}-{target.ident}.")
+                    logger.info(
+                        f"Actor {actor.team.name}-{actor.ident} attacked and hit actor {target.team.name}-{target.ident}."
+                    )
                     self.board.respawn(target)
                     already_attacked[actor] = True
 
             else:
-                logger.info(f"Actor {actor.player.name}-{actor.ident} did not attack. Actor can not attack or missed.")
+                logger.info(
+                    f"Actor {actor.team.name}-{actor.ident} did not attack. Actor can not attack or missed."
+                )
 
     def execute_grabput_orders(self, grabput_orders: list[GrabPutOrder]):
         already_grabbed = self.actor_dict(False)
         for order in grabput_orders:
-            actor = self.players_actors[(self.players[order.name], order.actor)]
+            actor = self.teams_actors[(self.names_teams[order.name], order.actor)]
             if (grab_roll := random.random() < actor.grab) and (
                 not already_grabbed[actor]
             ):
@@ -484,11 +563,15 @@ class Game:
             if target_actor is not None and (
                 not target_actor.grab or target_actor.flag is not None
             ):
-                logger.info(f"Actor {actor.player.name}-{actor.ident} can not hand the flag to actor {target_actor.player.name}-{target_actor.ident}.")
+                logger.info(
+                    f"Actor {actor.team.name}-{actor.ident} can not hand the flag to actor {target_actor.team.name}-{target_actor.ident}."
+                )
                 already_grabbed = False
             # if the target coordinates are a wall
             elif target_coordinates in self.board.walls_coordinates:
-                logger.info(f"Actor {actor.player.name}-{actor.ident} can not hand the flag to a wall.")
+                logger.info(
+                    f"Actor {actor.team.name}-{actor.ident} can not hand the flag to a wall."
+                )
                 already_grabbed = False
 
             # otherwise put the flag there
@@ -499,12 +582,16 @@ class Game:
                 # and assign it to the target if there is one
                 if target_actor is not None:
                     target_actor.flag = flag
-                    logger.info(f"Actor {actor.player.name}-{actor.ident} handed the flag to actor {target_actor.player.name}-{target_actor.ident}.")
+                    logger.info(
+                        f"Actor {actor.team.name}-{actor.ident} handed the flag to actor {target_actor.team.name}-{target_actor.ident}."
+                    )
                     self.check_flag_return_conditions(actor)
 
                 # the flag was put ont he field (maybe a base)
                 else:
-                    logger.info(f"Actor {actor.player.name}-{actor.ident} putthe flag to coordinates {target_coordinates}.")
+                    logger.info(
+                        f"Actor {actor.team.name}-{actor.ident} putthe flag to coordinates {target_coordinates}."
+                    )
                     self.check_score_conditions(flag, target_coordinates)
 
         # the actor does not have the flag
@@ -530,6 +617,7 @@ class Game:
             base = self.board.coordinates_bases[coordinates]
             # if flag is not standing on own base but another
             if base != flag:
+                logger.info(f"Team {self.teams[base]} scored {self.teams[flag]} flag!")
                 self.scores[base] += 1
 
     def check_flag_return_conditions(self, actor: Actor) -> None:
@@ -537,48 +625,78 @@ class Game:
         if coordinates in self.board.flags_coordinates.values():
             flag = self.board.coordinates_flags[coordinates]
             # if flag is own flag, return it to base
-            if flag == actor.player.number:
+            if flag == actor.team.number:
                 self.board.flags_coordinates[flag] = self.board.bases_coordinates[flag]
 
 
-@app.post("/command")
-async def command(order: MoveOrder | AttackOrder | GrabPutOrder):
+@app.post("/move_order")
+async def move_order(order: MoveOrder):
+    """Move an actor into a direction. Moving over your own flag return it to the base."""
     command_queue.put_nowait(order)
-    return {"message": "Command added."}
+    return {"message": "Move order added."}
+
+
+@app.post("/attack_order")
+async def attack_order(order: AttackOrder):
+    """Only actors with the attack property can attack."""
+    command_queue.put_nowait(order)
+    return {"message": "Attack order added."}
+
+
+@app.post("/grabput_order")
+async def grabput_order(order: GrabPutOrder):
+    """
+    "Moving over your own flag return it to the base."
+    """
+    command_queue.put_nowait(order)
+    return {"message": "Grabput order added."}
 
 
 @app.post("/register")
 async def register(order: RegisterOrder):
-    if len(game.players) >= game.max_players:
-        return {"message": "Maximum number of players reached"}
-    game.players[order.name] = Player(
-        name=order.name, password=order.password, number=len(game.players)
+    if len(game.names_teams) >= game.max_teams:
+        return {"message": "Maximum number of teams reached"}
+    game.teams.append(order.name)
+    game.names_teams[order.name] = team(
+        name=order.name, password=order.password, number=len(game.names_teams)
     )
     return {"message": "Successfully registered"}
 
 
 @app.get("/state")
-async def get_state():
-    pass
-    # TODO: think about serialization
-    # return StateResponse(
-    #     actors_coordinates=game.board.actors_coordinates,
-    #     players=list(game.players.keys()),
-    #     time_of_next_execution=game.time_of_next_execution,
-    # )
+async def get_state() -> StateResponse:
+    return StateResponse(
+        teams=game.teams,
+        actors=[
+            ActorDescriptions(
+                team=actor.team.name,
+                type=actor.name,
+                ident=actor.ident,
+                coordinates=coordinates,
+            )
+            for actor, coordinates in game.board.actors_coordinates.items()
+        ],
+        flags=list(game.board.flags_coordinates.values()),
+        bases=list(game.board.bases_coordinates.values()),
+        walls=list(game.board.walls_coordinates),
+        scores=list(game.scores.values()),
+        time_of_next_execution=game.time_of_next_execution,
+    )
+
 
 game = Game(
     Board(mapsize=MAPSIZE, walls=10),
-    max_players=3,
+    max_teams=3,
     actors=InitialActorsList(actors=[Runner, Attacker, Attacker]),
 )
+
 
 async def routine():
     waiting_seconds = 0
     max_wait = 10
 
     await logger.ainfo("Starting registration.")
-    while (len(game.players) < game.max_players) and (waiting_seconds <= max_wait):
+    while (len(game.names_teams) < game.max_teams) and (waiting_seconds <= max_wait):
         waiting_seconds += 1
         await asyncio.sleep(1)
 
@@ -590,6 +708,16 @@ async def routine():
         commands = await get_all_queue_items(command_queue)
 
         os.system("cls" if os.name == "nt" else "clear")
+        print(
+            " - ".join(
+                [
+                    f"{colors[i]}{name}: {score}{colors[99]}"
+                    for i, (name, score) in enumerate(
+                        zip(game.teams, game.scores.values())
+                    )
+                ]
+            )
+        )
         print(game.board.image())
 
         bind_contextvars(tick=game.tick)
