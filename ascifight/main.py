@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from pydantic import BaseModel, validator, ValidationError, Field, root_validator
+from pydantic import BaseModel, validator, ValidationError, Field
 from collections import defaultdict
 from typing import TypeVar, cast
 import frozendict
@@ -24,9 +24,13 @@ logger = structlog.get_logger()
 
 T = TypeVar("T")
 
-map_size = 15
+MAP_SIZE = 15
 WAIT_TIME = 5
-ACTORNUM = 3
+ACTORNUM = 1
+MAX_REGISTER_WAIT = 30
+MAX_SCORE = 3
+MAX_TICKS = 200
+
 SENTINEL = object()
 
 app = FastAPI()
@@ -47,9 +51,9 @@ colors = {
 
 base_place_matrix = [
     [[1, 4], [1, 4]],
-    [[1, 4], [map_size - 5, map_size - 2]],
-    [[map_size - 5, map_size - 2], [1, 4]],
-    [[map_size - 5, map_size - 2], [map_size - 5, map_size - 2]],
+    [[1, 4], [MAP_SIZE - 5, MAP_SIZE - 2]],
+    [[MAP_SIZE - 5, MAP_SIZE - 2], [1, 4]],
+    [[MAP_SIZE - 5, MAP_SIZE - 2], [MAP_SIZE - 5, MAP_SIZE - 2]],
 ]
 
 
@@ -71,12 +75,12 @@ class Coordinates(BaseModel):
     x: int = Field(
         description="X coodinate is decreased by the 'left' and increased by the 'right' direction.",
         ge=0,
-        le=map_size - 1,
+        le=MAP_SIZE - 1,
     )
     y: int = Field(
         description="Y coodinate is decreased by the 'down' and increased by the 'up' direction.",
         ge=0,
-        le=map_size - 1,
+        le=MAP_SIZE - 1,
     )
 
     def __eq__(self, another):
@@ -126,7 +130,6 @@ class GrabPutOrder(Order):
         title="Direction",
         description=(
             "The direction to grap of put the flag from the position of the actor. "
-            "If the actor has a flag it outs it, if it doesnt have a flag, it grabs it, even from another actor."
         ),
     )
 
@@ -200,15 +203,17 @@ class ActorDescriptions(BaseModel):
 
 
 class StateResponse(BaseModel):
-    teams: list[str] = Field(description="A list of all teams in the game.")
+    teams: list[str] = Field(
+        description="A list of all teams in the game. This is also the order of flags and bases."
+    )
     actors: list[ActorDescriptions] = Field(
         description="A list of all actors in the game."
     )
     flags: list[Coordinates] = Field(
-        description="A list of all flags in the game. The flags are orderd according to the teams they belong to."
+        description="A list of all flags in the game. The flags are ordered according to the teams they belong to."
     )
     bases: list[Coordinates] = Field(
-        description="A list of all bases in the game. The bases are orderd according to the teams they belong to."
+        description="A list of all bases in the game. The bases are ordered according to the teams they belong to."
     )
     walls: list[Coordinates] = Field(
         description="A list of all walls in the game. Actors can not enter wall fields."
@@ -223,12 +228,17 @@ class StateResponse(BaseModel):
 
 class ActorProperty(BaseModel):
     type: str
-    grab: float
-    attack: float
+    grab: float = Field(
+        description="The probability to successfully grab or put the flag. "
+        "An actor with 0 can not carry the flag. Not even when it is given to it.",
+    )
+    attack: float = Field(
+        description="The probability to successfully attack. An actor with 0 can not attack.",
+    )
 
 
 class PropertiesResponse(BaseModel):
-    map_size = map_size
+    map_size = MAP_SIZE
     actor_types: list[ActorProperty]
 
 
@@ -333,7 +343,7 @@ class Board:
             self.flags_coordinates[flag] = new_coordinates
 
         logger.info(
-            f"Actor {actor.team.name}-{actor.ident} moved from {coordinates} to {new_coordinates}"
+            f"Actor {actor.team.name}-{actor.ident} moved from ({coordinates}) to ({new_coordinates})"
         )
         return True
 
@@ -626,9 +636,7 @@ async def attack_order(order: AttackOrder):
 
 @app.post("/grabput_order")
 async def grabput_order(order: GrabPutOrder):
-    """
-    "Moving over your own flag return it to the base."
-    """
+    """If the actor has a flag it puts it, even to another actor that can carry it. If it doesnt have a flag, it grabs it, even from another actor."""
     command_queue.put_nowait(order)
     return {"message": "Grabput order added."}
 
@@ -652,7 +660,7 @@ async def get_state() -> StateResponse:
         actors=[
             ActorDescriptions(
                 team=actor.team.name,
-                type=actor.name,
+                type=actor.type,
                 ident=actor.ident,
                 coordinates=coordinates,
             )
@@ -673,14 +681,15 @@ async def get_game_properties() -> PropertiesResponse:
         ActorProperty(type=actor.type, grab=actor.grab, attack=actor.attack)
         for actor in set(game.actors)
     ]
-    return PropertiesResponse(map_size=game.board.map_size, actor_types=actor_types)
+    return PropertiesResponse(actor_types=actor_types)
 
 
 game = Game(
-    Board(map_size=map_size, walls=0),
+    Board(map_size=MAP_SIZE, walls=0),
     max_teams=3,
     actors=InitialActorsList(actors=[Runner]),
 )
+
 # game = Game(
 #     Board(map_size=map_size, walls=0),
 #     max_teams=3,
@@ -708,17 +717,18 @@ game = Game(
 
 async def routine():
     waiting_seconds = 0
-    max_wait = 10
 
     await logger.ainfo("Starting registration.")
-    while (len(game.names_teams) < game.max_teams) and (waiting_seconds <= max_wait):
+    while (len(game.names_teams) < game.max_teams) and (
+        waiting_seconds <= MAX_REGISTER_WAIT
+    ):
         waiting_seconds += 1
         await asyncio.sleep(1)
 
     await logger.ainfo("Initiating game.")
     game.initiate_game()
 
-    while True:
+    while game.tick < MAX_TICKS and max(game.scores.values()) < MAX_SCORE:
         await command_queue.put(SENTINEL)
         commands = await get_all_queue_items(command_queue)
 
