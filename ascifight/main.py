@@ -167,7 +167,7 @@ You can perform a couple of orders do reach your goals of co-worker domination. 
 below. 
 But beware, each _actor_ can only carry out each order only once per game tick.
 
-### MoveOrder
+### Move Order
 
 With a move order you can move around any of your _actors_, by exactly one field in any non-diagonal direction. 
 
@@ -194,7 +194,7 @@ GrabPut actions only have a certain probability to work. If the _grab_ property 
 
 Only _actors_ with a non-zero _grab_ property can _grabput_.
 
-### AttackOrder
+### Attack Order
 
 With attack orders you can force other actors, even your own, to respawn near their base. Just hit them and they are gone.
 
@@ -244,7 +244,7 @@ tags_metadata = [
 
 app = FastAPI(
     openapi_tags=tags_metadata,
-    title="A Social Community Increasing - Fight",
+    title="A Social, Community Increasing - Fight",
     description=description,
     version="0.1",
     contact={
