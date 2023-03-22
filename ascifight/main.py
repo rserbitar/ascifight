@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ValidationError, Field
-from typing import TypeVar
 import logging
 import structlog
 from structlog.contextvars import bind_contextvars
@@ -112,9 +111,6 @@ for handler in root_logger.handlers:
         handler.doRollover()
 
 logger = structlog.get_logger()
-
-
-T = TypeVar("T")
 
 
 WAIT_TIME = 5
@@ -264,37 +260,37 @@ async def get_logfiles() -> list[str]:
 
 
 teams = [
-    game.Team(name="Superteam", password="123", number=0),
-    game.Team(name="Gigateam", password="123", number=1),
-    game.Team(name="Megateam", password="123", number=2),
+    game.Team(name="S", password="1", number=0),
+    game.Team(name="G", password="1", number=1),
+    game.Team(name="M", password="1", number=2),
 ]
 
 mygame = game.Game(
     teams=teams,
     pregame_wait=PREGAME_WAIT,
     board=game.Board(map_size=game.MAP_SIZE, walls=0),
-    actors=game.InitialActorsList(actors=[game.Runner]),
+    actors=game.InitialActorsList(actors=[game.Generalist]),
 )
 
 
 # game = Game(teams=teams, pregame_wait = PREGAME_WAIT,
-#     board=Board(map_size=map_size, walls=0),
-#     actors=InitialActorsList(actors=[Generalist, Generalist, Generalist]),
+#     board=Board(map_size=game.MAP_SIZE, walls=0),
+#     actors=InitialActorsList(actors=[game.Generalist, game.Generalist, game.Generalist]),
 # )
 
 # game = Game(teams=teams, pregame_wait = PREGAME_WAIT,
-#     board=Board(map_size=map_size, walls=0),
-#     actors=InitialActorsList(actors=[Runner, Attacker, Attacker]),
+#     board=Board(map_size=game.MAP_SIZE, walls=0),
+#     actors=InitialActorsList(actors=[game.Runner, game.Attacker, game.Attacker]),
 # )
 
 # game = Game(teams=teams, pregame_wait = PREGAME_WAIT,
-#     board=Board(map_size=map_size, walls=10),
-#     actors=InitialActorsList(actors=[Runner, Attacker, Attacker]),
+#     board=Board(map_size=game.MAP_SIZE, walls=10),
+#     actors=InitialActorsList(actors=[game.Runner, game.Attacker, game.Attacker]),
 # )
 
 # game = Game(teams=teams, pregame_wait = PREGAME_WAIT,
-#     board=Board(map_size=map_size, walls=10),
-#     actors=InitialActorsList(actors=[Runner, Attacker, Attacker, Blocker, Blocker]),
+#     board=Board(map_size=game.MAP_SIZE, walls=10),
+#     actors=InitialActorsList(actors=[game.Runner, game.Attacker, game.Attacker, game.Blocker, game.Blocker]),
 # )
 
 
@@ -309,16 +305,16 @@ async def routine():
 
     while mygame.tick < game.MAX_TICKS and max(mygame.scores.values()) < game.MAX_SCORE:
         await command_queue.put(SENTINEL)
+
         commands = await get_all_queue_items(command_queue)
 
-        os.system("cls" if os.name == "nt" else "clear")
-        print(mygame.scoreboard())
-        print(mygame.board.image())
-
         bind_contextvars(tick=mygame.tick)
-
+        os.system("cls" if os.name == "nt" else "clear")
         logger.info("Starting tick execution.")
         mygame.execute_gamestep(commands)
+
+        print(mygame.scoreboard())
+        print(mygame.board.image())
 
         logger.info("Waiting for game commands.")
         mygame.time_of_next_execution = datetime.datetime.now() + datetime.timedelta(
@@ -346,15 +342,15 @@ async def ai_generator():
     while True:
         await asyncio.sleep(5)
         await command_queue.put(
-            game.MoveOrder(name="Superteam", password="123", actor=0, direction="down")
+            game.MoveOrder(team="Superteam", password="123", actor=0, direction="down")
         )
         await asyncio.sleep(5)
         await command_queue.put(
-            game.MoveOrder(name="Superteam", password="123", actor=0, direction="right")
+            game.MoveOrder(team="Superteam", password="123", actor=0, direction="right")
         )
 
 
 @app.on_event("startup")
 async def startup():
     asyncio.create_task(routine())
-    asyncio.create_task(ai_generator())
+    # asyncio.create_task(ai_generator())
