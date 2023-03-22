@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ValidationError, Field
 from typing import TypeVar
 import logging
@@ -11,6 +12,7 @@ from structlog.contextvars import (
     unbind_contextvars,
 )
 
+import datetime
 import asyncio
 import itertools
 import enum
@@ -33,7 +35,8 @@ import abc
 #     cache_logger_on_first_use=False,
 # )
 
-timestamper = structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S")
+
+timestamper = structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S.%f", utc=False)
 pre_chain = [
     # Add the log level and a timestamp to the event_dict if the log entry
     # is not from structlog.
@@ -68,7 +71,6 @@ logging.config.dictConfig(
                     structlog.processors.add_log_level,
                     structlog.processors.StackInfoRenderer(),
                     structlog.dev.set_exc_info,
-                    structlog.processors.TimeStamper(),
                     structlog.dev.ConsoleRenderer(colors=True),
                 ],
                 "foreign_pre_chain": pre_chain,
@@ -82,8 +84,9 @@ logging.config.dictConfig(
             },
             "file": {
                 "level": "DEBUG",
-                "class": "logging.handlers.WatchedFileHandler",
-                "filename": "test.log",
+                "class": "logging.handlers.RotatingFileHandler",
+                "filename": "logs/game.log",
+                "backupCount": 100,
                 "formatter": "plain",
             },
         },
@@ -110,7 +113,12 @@ structlog.configure(
     cache_logger_on_first_use=True,
 )
 
+root_logger = logging.getLogger()
 logger = structlog.get_logger()
+
+for handler in root_logger.handlers:
+    if handler.__class__.__name__ == "RotatingFileHandler":
+        handler.doRollover()
 
 
 T = TypeVar("T")
@@ -121,10 +129,13 @@ ACTORNUM = 1
 PREGAME_WAIT = 3
 MAX_SCORE = 3
 MAX_TICKS = 200
+LOGDIR = "logs"
 
 SENTINEL = object()
 
 app = FastAPI()
+app.mount("/logs", StaticFiles(directory=LOGDIR), name="logs")
+
 command_queue = asyncio.Queue()
 
 
@@ -135,8 +146,8 @@ colors = {
     3: "\u001b[34m",
     4: "\u001b[35m",
     5: "\u001b[36m",
-    44: "\033[1m",
-    99: "\x1b[0m",
+    "bold": "\033[1m",
+    "revert": "\x1b[0m",
 }
 
 
@@ -313,8 +324,15 @@ class StateResponse(BaseModel):
         description="A list of the current scores. The scored are orderd according to the teams they belong to."
     )
     tick: int = Field(decription="The last game tick.")
-    time_of_next_execution: float = Field(
-        description="The linux time of next execution."
+    time_of_next_execution: datetime.datetime = Field(
+        description="The time of next execution."
+    )
+
+
+class TimingResponse(BaseModel):
+    tick: int = Field(decription="The last game tick.")
+    time_of_next_execution: datetime.datetime = Field(
+        description="The time of next execution."
     )
 
 
@@ -453,16 +471,16 @@ class Board:
         field = [["___" for _ in range(self.map_size)] for _ in range(self.map_size)]
 
         for i, base in enumerate(self.bases_coordinates.values()):
-            field[base.y][base.x] = f" {colors[i]}\u25D9{colors[99]} "
+            field[base.y][base.x] = f" {colors[i]}\u25D9{colors['revert']} "
         for actor, coordinates in self.actors_coordinates.items():
             char = actor.type[0].upper()
             color = colors[actor.team.number]
-            field[coordinates.y][coordinates.x] = f" {color}{char}{colors[99]} "
+            field[coordinates.y][coordinates.x] = f" {color}{char}{colors['revert']} "
         for flag, coordinates in self.flags_coordinates.items():
             color = colors[flag]
             before = field[coordinates.y][coordinates.x]
             field[coordinates.y][coordinates.x] = (
-                before[:-2] + f" {color}\u25B2{colors[99]}"
+                before[:-2] + f" {color}\u25B2{colors['revert']}"
             )
         for wall_coordinate in self.walls_coordinates:
             field[wall_coordinate.y][wall_coordinate.x] = "\u2588\u2588\u2588"
@@ -536,7 +554,7 @@ class Game:
         self.teams_actors: dict[tuple[Team, int], Actor] = {}
         self.scores: dict[int, int] = {}
 
-        self.time_of_next_execution = 0.0
+        self.time_of_next_execution = datetime.datetime.now()
         self.pregame_wait = pregame_wait
         self.tick = 0
 
@@ -792,10 +810,19 @@ async def get_game_properties() -> PropertiesResponse:
     return PropertiesResponse(actor_types=actor_types)
 
 
-@app.get("/time_to_next_game")
-async def get_time_to_next_game() -> int:
-    """Get the time to next game in seconds."""
-    return game.pregame_wait
+@app.get("/timeing")
+async def get_timeing() -> TimingResponse:
+    """Get the current tick and time of next execution."""
+    return TimingResponse(
+        tick=game.tick,
+        time_of_next_execution=game.time_of_next_execution,
+    )
+
+
+@app.get("/logfiles")
+async def get_logfiles() -> list[str]:
+    """Get all log files accesible through /logs/[filename]"""
+    return os.listdir(LOGDIR)
 
 
 teams = [
@@ -850,7 +877,7 @@ async def routine():
         print(
             " - ".join(
                 [
-                    f"{colors[i]}{name}: {score}{colors[99]}"
+                    f"{colors[i]}{name}: {score}{colors['revert']}"
                     for i, (name, score) in enumerate(
                         zip(game.teams, game.scores.values())
                     )
@@ -865,7 +892,11 @@ async def routine():
         game.execute_gamestep(commands)
 
         logger.info("Waiting for game commands.")
-        game.time_of_next_execution = asyncio.get_running_loop().time() + WAIT_TIME
+        game.time_of_next_execution = datetime.datetime.now() + datetime.timedelta(
+            0, WAIT_TIME
+        )
+        next_execution = game.time_of_next_execution
+        logger.info(f"Time of next execution: {next_execution}")
 
         await asyncio.sleep(WAIT_TIME)
 
