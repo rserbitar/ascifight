@@ -10,7 +10,7 @@ import abc
 MAP_SIZE = 15
 MAX_SCORE = 3
 MAX_TICKS = 200
-ACTORNUM = 1
+ACTOR_NUM = 1
 
 
 colors = {
@@ -35,20 +35,20 @@ class Directions(str, enum.Enum):
 
 
 class Order(BaseModel):
-    team: str = Field(decription="Name of the team to issue the order.")
+    team: str = Field(description="Name of the team to issue the order.")
     password: str = Field(
-        decscription="The password for the team used during registering."
+        description="The password for the team used during registering."
     )
 
 
 class Coordinates(BaseModel):
     x: int = Field(
-        description="X coodinate is decreased by the 'left' and increased by the 'right' direction.",
+        description="X coordinate is decreased by the 'left' and increased by the 'right' direction.",
         ge=0,
         le=MAP_SIZE - 1,
     )
     y: int = Field(
-        description="Y coodinate is decreased by the 'down' and increased by the 'up' direction.",
+        description="Y coordinate is decreased by the 'down' and increased by the 'up' direction.",
         ge=0,
         le=MAP_SIZE - 1,
     )
@@ -69,7 +69,7 @@ class AttackOrder(Order):
     actor: int = Field(
         description="The id of the actor, specific to the team.",
         ge=0,
-        le=ACTORNUM - 1,
+        le=ACTOR_NUM - 1,
     )
     direction: Directions = Field(
         title="Direction",
@@ -81,7 +81,7 @@ class MoveOrder(Order):
     actor: int = Field(
         description="The id of the actor, specific to the team.",
         ge=0,
-        le=ACTORNUM - 1,
+        le=ACTOR_NUM - 1,
     )
     direction: Directions = Field(
         title="Direction",
@@ -94,12 +94,12 @@ class GrabPutOrder(Order):
         title="Actor",
         description="The id of the actor, specific to the team.",
         ge=0,
-        le=ACTORNUM - 1,
+        le=ACTOR_NUM - 1,
     )
     direction: Directions = Field(
         title="Direction",
         description=(
-            "The direction to grap of put the flag from the position of the actor. "
+            "The direction to grab of put the flag from the position of the actor. "
         ),
     )
 
@@ -157,7 +157,7 @@ class Blocker(Actor):
 
 
 class InitialActorsList(BaseModel):
-    actors: list[type[Actor]] = Field(min_items=ACTORNUM, max_items=ACTORNUM)
+    actors: list[type[Actor]] = Field(min_items=ACTOR_NUM, max_items=ACTOR_NUM)
 
 
 class Board:
@@ -331,12 +331,12 @@ class Board:
             self.actors_coordinates[actor] = coordinates
 
     def place_walls(self) -> None:
-        forbidden_postions = set()
+        forbidden_positions = set()
         for base_coordinates in self.bases_coordinates.values():
             for x in range(base_coordinates.x - 2, base_coordinates.x + 3):
                 for y in range(base_coordinates.y - 2, base_coordinates.y + 3):
                     try:
-                        forbidden_postions.add(Coordinates(x=x, y=y))
+                        forbidden_positions.add(Coordinates(x=x, y=y))
                     # ignore forbidden space out of bounds
                     except ValidationError:
                         pass
@@ -346,7 +346,7 @@ class Board:
                 x=random.randint(0, self.map_size - 1),
                 y=random.randint(0, self.map_size - 1),
             )
-            if coordinates not in forbidden_postions:
+            if coordinates not in forbidden_positions:
                 self.walls_coordinates.add(coordinates)
                 walls += 1
 
@@ -434,7 +434,7 @@ class Game:
             )
         return check
 
-    def execute_gamestep(self, orders: list[Order]) -> None:
+    def execute_game_step(self, orders: list[Order]) -> None:
         self.tick += 1
 
         move_orders: list[MoveOrder] = []
@@ -475,7 +475,7 @@ class Game:
         for order in attack_orders:
             actor = self.teams_actors[(self.names_teams[order.team], order.actor)]
 
-            # if the actor can not attack or the attack missed or it aldready attacked
+            # if the actor can not attack or the attack missed or it already attacked
             if (attack_roll := random.random() < actor.attack) and (
                 not already_attacked[actor]
             ):
@@ -518,7 +518,7 @@ class Game:
 
             # if there is a target actor
             if target_actor is not None:
-                # target actor can not have the glag
+                # target actor can not have the flag
                 if not target_actor.grab:
                     already_grabbed = False
                     self.logger.warning(
@@ -570,7 +570,7 @@ class Game:
                 if target_actor is not None:
                     target_actor.flag = None
 
-            # if there is no flag at the destionation, do nothing
+            # if there is no flag at the destination, do nothing
             else:
                 already_grabbed = False
 
@@ -578,15 +578,16 @@ class Game:
 
     def check_score_conditions(self, flag: int) -> None:
         coordinates = self.board.flags_coordinates[flag]
-        if coordinates in self.board.bases_coordinates.values():
-            base = self.board.coordinates_bases[coordinates]
-            # if flag is not standing on own base but another
-            if base != flag:
-                self.logger.info(
-                    f"Team {self.teams[base]} scored {self.teams[flag]} flag!"
-                )
-                self.scores[base] += 1
-                self.board.flags_coordinates[flag] = self.board.bases_coordinates[flag]
+        base = self.board.coordinates_bases.get(coordinates)
+        # if the flag is an enemy flag and owner flag is also there
+        if (
+            base
+            and (flag != base)
+            and self.board.flags_coordinates[base] == coordinates
+        ):
+            self.logger.info(f"Team {self.teams[base]} scored {self.teams[flag]} flag!")
+            self.scores[base] += 1
+            self.board.flags_coordinates[flag] = self.board.bases_coordinates[flag]
 
     def check_flag_return_conditions(self, actor: Actor) -> None:
         coordinates = self.board.actors_coordinates[actor]
