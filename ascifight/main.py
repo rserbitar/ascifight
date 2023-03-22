@@ -1,8 +1,7 @@
 from fastapi import FastAPI
-from pydantic import BaseModel, validator, ValidationError, Field
-from collections import defaultdict
-from typing import TypeVar, cast
-import frozendict
+from pydantic import BaseModel, ValidationError, Field
+from typing import TypeVar
+import logging
 import structlog
 from structlog.contextvars import (
     bind_contextvars,
@@ -15,19 +14,111 @@ from structlog.contextvars import (
 import asyncio
 import itertools
 import enum
-import copy
 import os
 import random
 import abc
 
+# structlog.configure(
+#     processors=[
+#         structlog.contextvars.merge_contextvars,
+#         structlog.processors.add_log_level,
+#         structlog.processors.StackInfoRenderer(),
+#         structlog.dev.set_exc_info,
+#         structlog.processors.TimeStamper(),
+#         structlog.dev.ConsoleRenderer(),
+#     ],
+#     context_class=dict,
+#     wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+#     logger_factory=structlog.PrintLoggerFactory(),
+#     cache_logger_on_first_use=False,
+# )
+
+timestamper = structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S")
+pre_chain = [
+    # Add the log level and a timestamp to the event_dict if the log entry
+    # is not from structlog.
+    structlog.stdlib.add_log_level,
+    # Add extra attributes of LogRecord objects to the event dictionary
+    # so that values passed in the extra parameter of log methods pass
+    # through to log output.
+    structlog.stdlib.ExtraAdder(),
+    timestamper,
+]
+
+
+logging.config.dictConfig(
+    {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "plain": {
+                "()": structlog.stdlib.ProcessorFormatter,
+                "processors": [
+                    structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+                    structlog.contextvars.merge_contextvars,
+                    structlog.processors.JSONRenderer(sort_keys=True),
+                ],
+                "foreign_pre_chain": pre_chain,
+            },
+            "colored": {
+                "()": structlog.stdlib.ProcessorFormatter,
+                "processors": [
+                    structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+                    structlog.contextvars.merge_contextvars,
+                    structlog.processors.add_log_level,
+                    structlog.processors.StackInfoRenderer(),
+                    structlog.dev.set_exc_info,
+                    structlog.processors.TimeStamper(),
+                    structlog.dev.ConsoleRenderer(colors=True),
+                ],
+                "foreign_pre_chain": pre_chain,
+            },
+        },
+        "handlers": {
+            "default": {
+                "level": "DEBUG",
+                "class": "logging.StreamHandler",
+                "formatter": "colored",
+            },
+            "file": {
+                "level": "DEBUG",
+                "class": "logging.handlers.WatchedFileHandler",
+                "filename": "test.log",
+                "formatter": "plain",
+            },
+        },
+        "loggers": {
+            "": {
+                "handlers": ["default", "file"],
+                "level": "DEBUG",
+                "propagate": True,
+            },
+        },
+    }
+)
+structlog.configure(
+    processors=[
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.PositionalArgumentsFormatter(),
+        timestamper,
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+    ],
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    wrapper_class=structlog.stdlib.BoundLogger,
+    cache_logger_on_first_use=True,
+)
+
 logger = structlog.get_logger()
+
 
 T = TypeVar("T")
 
 MAP_SIZE = 15
 WAIT_TIME = 5
 ACTORNUM = 1
-MAX_REGISTER_WAIT = 30
+PREGAME_WAIT = 3
 MAX_SCORE = 3
 MAX_TICKS = 200
 
@@ -221,6 +312,7 @@ class StateResponse(BaseModel):
     scores: list[int] = Field(
         description="A list of the current scores. The scored are orderd according to the teams they belong to."
     )
+    tick: int = Field(decription="The last game tick.")
     time_of_next_execution: float = Field(
         description="The linux time of next execution."
     )
@@ -238,7 +330,17 @@ class ActorProperty(BaseModel):
 
 
 class PropertiesResponse(BaseModel):
-    map_size = MAP_SIZE
+    map_size: int = Field(
+        default=MAP_SIZE, description="The length of the game board in x and y."
+    )
+    max_ticks: int = Field(
+        default=MAX_TICKS,
+        description="TThe maximum number of ticks the game will last.",
+    )
+    max_score: int = Field(
+        default=MAX_SCORE,
+        description="The maximum score that will force the game to end.",
+    )
     actor_types: list[ActorProperty]
 
 
@@ -420,17 +522,33 @@ class Board:
 
 
 class Game:
-    def __init__(self, board: Board, max_teams: int, actors: InitialActorsList) -> None:
-        self.max_teams = max_teams
+    def __init__(
+        self,
+        pregame_wait: int,
+        board: Board,
+        teams: list[Team],
+        actors: InitialActorsList,
+    ) -> None:
         self.actors = actors.actors
         self.board = board
-        self.teams: list[str] = []
-        self.names_teams: dict[str, Team] = {}
+        self.teams: list[str] = [team.name for team in teams]
+        self.names_teams: dict[str, Team] = {team.name: team for team in teams}
         self.teams_actors: dict[tuple[Team, int], Actor] = {}
         self.scores: dict[int, int] = {}
 
         self.time_of_next_execution = 0.0
+        self.pregame_wait = pregame_wait
         self.tick = 0
+
+    @property
+    def actors_of_team(self) -> dict[str, list[Actor]]:
+        actors_of_team = {}
+        for team in self.names_teams.values():
+            actors = []
+            for i in range(len(self.actors)):
+                actors.append(self.teams_actors[(team, i)])
+            actors_of_team[team.name] = actors
+        return actors_of_team
 
     def initiate_game(self) -> None:
         self.set_scores()
@@ -641,17 +759,6 @@ async def grabput_order(order: GrabPutOrder):
     return {"message": "Grabput order added."}
 
 
-@app.post("/register")
-async def register(order: RegisterOrder):
-    if len(game.names_teams) >= game.max_teams:
-        return {"message": "Maximum number of teams reached"}
-    game.teams.append(order.name)
-    game.names_teams[order.name] = Team(
-        name=order.name, password=order.password, number=len(game.names_teams)
-    )
-    return {"message": "Successfully registered"}
-
-
 @app.get("/state")
 async def get_state() -> StateResponse:
     """Get the current state of the game including locations of all actors, flags, bases and walls."""
@@ -670,62 +777,69 @@ async def get_state() -> StateResponse:
         bases=list(game.board.bases_coordinates.values()),
         walls=list(game.board.walls_coordinates),
         scores=list(game.scores.values()),
+        tick=game.tick,
         time_of_next_execution=game.time_of_next_execution,
     )
 
 
-@app.get("/state")
+@app.get("/game_properties")
 async def get_game_properties() -> PropertiesResponse:
-    """Get the current rules mostly actor properties."""
+    """Get the current rules and actor properties."""
     actor_types = [
         ActorProperty(type=actor.type, grab=actor.grab, attack=actor.attack)
-        for actor in set(game.actors)
+        for actor in game.actors_of_team[game.teams[0]]
     ]
     return PropertiesResponse(actor_types=actor_types)
 
 
+@app.get("/time_to_next_game")
+async def get_time_to_next_game() -> int:
+    """Get the time to next game in seconds."""
+    return game.pregame_wait
+
+
+teams = [
+    Team(name="Superteam", password="123", number=0),
+    Team(name="Gigateam", password="123", number=1),
+    Team(name="Megateam", password="123", number=2),
+]
+
 game = Game(
-    Board(map_size=MAP_SIZE, walls=0),
-    max_teams=3,
+    teams=teams,
+    pregame_wait=PREGAME_WAIT,
+    board=Board(map_size=MAP_SIZE, walls=0),
     actors=InitialActorsList(actors=[Runner]),
 )
 
-# game = Game(
-#     Board(map_size=map_size, walls=0),
-#     max_teams=3,
+
+# game = Game(teams=teams, pregame_wait = PREGAME_WAIT,
+#     board=Board(map_size=map_size, walls=0),
 #     actors=InitialActorsList(actors=[Generalist, Generalist, Generalist]),
 # )
 
-# game = Game(
-#     Board(map_size=map_size, walls=0),
-#     max_teams=3,
+# game = Game(teams=teams, pregame_wait = PREGAME_WAIT,
+#     board=Board(map_size=map_size, walls=0),
 #     actors=InitialActorsList(actors=[Runner, Attacker, Attacker]),
 # )
 
-# game = Game(
-#     Board(map_size=map_size, walls=10),
-#     max_teams=3,
+# game = Game(teams=teams, pregame_wait = PREGAME_WAIT,
+#     board=Board(map_size=map_size, walls=10),
 #     actors=InitialActorsList(actors=[Runner, Attacker, Attacker]),
 # )
 
-# game = Game(
-#     Board(map_size=map_size, walls=10),
-#     max_teams=3,
+# game = Game(teams=teams, pregame_wait = PREGAME_WAIT,
+#     board=Board(map_size=map_size, walls=10),
 #     actors=InitialActorsList(actors=[Runner, Attacker, Attacker, Blocker, Blocker]),
 # )
 
 
 async def routine():
-    waiting_seconds = 0
-
-    await logger.ainfo("Starting registration.")
-    while (len(game.names_teams) < game.max_teams) and (
-        waiting_seconds <= MAX_REGISTER_WAIT
-    ):
-        waiting_seconds += 1
+    logger.info("Starting pre-game.")
+    while game.pregame_wait > 0:
         await asyncio.sleep(1)
+        game.pregame_wait -= 1
 
-    await logger.ainfo("Initiating game.")
+    logger.info("Initiating game.")
     game.initiate_game()
 
     while game.tick < MAX_TICKS and max(game.scores.values()) < MAX_SCORE:
@@ -747,10 +861,10 @@ async def routine():
 
         bind_contextvars(tick=game.tick)
 
-        await logger.ainfo("Starting tick execution.")
+        logger.info("Starting tick execution.")
         game.execute_gamestep(commands)
 
-        await logger.ainfo("Waiting for game commands.")
+        logger.info("Waiting for game commands.")
         game.time_of_next_execution = asyncio.get_running_loop().time() + WAIT_TIME
 
         await asyncio.sleep(WAIT_TIME)
@@ -769,17 +883,14 @@ async def get_all_queue_items(queue):
 
 async def ai_generator():
     await asyncio.sleep(1)
-    await register(RegisterOrder(name="Schwubi", password="Dubi"))
-    await register(RegisterOrder(name="Bubi", password="Wubi"))
-    await register(RegisterOrder(name="Trubi", password="Fubi"))
     while True:
         await asyncio.sleep(5)
         await command_queue.put(
-            MoveOrder(name="Schwubi", password="Dubi", actor=0, direction="down")
+            MoveOrder(name="Superteam", password="123", actor=0, direction="down")
         )
         await asyncio.sleep(5)
         await command_queue.put(
-            MoveOrder(name="Schwubi", password="Dubi", actor=0, direction="right")
+            MoveOrder(name="Superteam", password="123", actor=0, direction="right")
         )
 
 
