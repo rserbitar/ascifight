@@ -292,6 +292,9 @@ class StateResponse(BaseModel):
 
 class TimingResponse(BaseModel):
     tick: int = Field(description="The last game tick.")
+    time_to_next_execution: datetime.timedelta = Field(
+        description="The time to next execution in seconds."
+    )
     time_of_next_execution: datetime.datetime = Field(
         description="The time of next execution."
     )
@@ -382,6 +385,7 @@ async def get_timing() -> TimingResponse:
     """Get the current tick and time of next execution."""
     return TimingResponse(
         tick=my_game.tick,
+        time_to_next_execution=my_game.time_to_next_execution,
         time_of_next_execution=my_game.time_of_next_execution,
     )
 
@@ -407,28 +411,28 @@ teams = [
 my_game = game.Game(
     teams=teams,
     pregame_wait=PREGAME_WAIT,
-    board=game.Board(map_size=game.MAP_SIZE, walls=0),
+    board=game.Board(walls=0),
     actors=game.InitialActorsList(actors=[game.Generalist]),
 )
 
 
 # game = Game(teams=teams, pregame_wait = PREGAME_WAIT,
-#     board=Board(map_size=game.MAP_SIZE, walls=0),
+#     board=Board(walls=0),
 #     actors=InitialActorsList(actors=[game.Generalist, game.Generalist, game.Generalist]),
 # )
 
 # game = Game(teams=teams, pregame_wait = PREGAME_WAIT,
-#     board=Board(map_size=game.MAP_SIZE, walls=0),
+#     board=Board(walls=0),
 #     actors=InitialActorsList(actors=[game.Runner, game.Attacker, game.Attacker]),
 # )
 
 # game = Game(teams=teams, pregame_wait = PREGAME_WAIT,
-#     board=Board(map_size=game.MAP_SIZE, walls=10),
+#     board=Board(walls=10),
 #     actors=InitialActorsList(actors=[game.Runner, game.Attacker, game.Attacker]),
 # )
 
 # game = Game(teams=teams, pregame_wait = PREGAME_WAIT,
-#     board=Board(map_size=game.MAP_SIZE, walls=10),
+#     board=Board(walls=10),
 #     actors=InitialActorsList(actors=[game.Runner, game.Attacker, game.Attacker, game.Blocker, game.Blocker]),
 # )
 

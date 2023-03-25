@@ -183,9 +183,9 @@ class InitialActorsList(BaseModel):
 
 
 class Board:
-    def __init__(self, map_size: int, walls=0) -> None:
+    def __init__(self, walls=0) -> None:
         self.logger = structlog.get_logger()
-        self.map_size = map_size
+        self.map_size = MAP_SIZE
         self.walls = walls
 
         self.logger = logger = structlog.get_logger()
@@ -391,6 +391,10 @@ class Game:
         self.time_of_next_execution = datetime.datetime.now()
         self.pregame_wait = pregame_wait
         self.tick = 0
+
+    @property
+    def time_to_next_execution(self) -> datetime.timedelta:
+        return self.time_of_next_execution - datetime.datetime.now()
 
     @property
     def actors_of_team(self) -> dict[str, list[Actor]]:
