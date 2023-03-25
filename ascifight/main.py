@@ -452,11 +452,11 @@ async def routine():
         bind_contextvars(tick=my_game.tick)
         os.system("cls" if os.name == "nt" else "clear")
 
-        logger.info("Starting tick execution.")
-        my_game.execute_game_step(commands)
-
         print(my_game.scoreboard())
         print(my_game.board.image())
+
+        logger.info("Starting tick execution.")
+        my_game.execute_game_step(commands)
 
         logger.info("Waiting for game commands.")
         my_game.time_of_next_execution = datetime.datetime.now() + datetime.timedelta(
@@ -484,15 +484,15 @@ async def ai_generator():
     while True:
         await asyncio.sleep(5)
         await command_queue.put(
-            game.MoveOrder(team="Superteam", password="123", actor=0, direction="down")
+            game.MoveOrder(team="S", password="1", actor=0, direction="down")
         )
         await asyncio.sleep(5)
         await command_queue.put(
-            game.MoveOrder(team="Superteam", password="123", actor=0, direction="right")
+            game.MoveOrder(team="S", password="1", actor=0, direction="right")
         )
 
 
 @app.on_event("startup")
 async def startup():
     asyncio.create_task(routine())
-    # asyncio.create_task(ai_generator())
+    asyncio.create_task(ai_generator())

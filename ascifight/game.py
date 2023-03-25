@@ -2,6 +2,7 @@ from pydantic import BaseModel, ValidationError, Field
 from typing import TypeVar
 import datetime
 import structlog
+from structlog.contextvars import bind_contextvars, unbind_contextvars
 import enum
 import itertools
 import random
@@ -40,6 +41,9 @@ class Order(BaseModel):
         description="The password for the team used during registering."
     )
 
+    def __str__(self):
+        return f"Order by {self.team}"
+
 
 class Coordinates(BaseModel):
     x: int = Field(
@@ -52,6 +56,9 @@ class Coordinates(BaseModel):
         ge=0,
         le=MAP_SIZE - 1,
     )
+
+    def __str__(self):
+        return f"({self.x}/{self.y})"
 
     def __eq__(self, another):
         return (
@@ -76,6 +83,9 @@ class AttackOrder(Order):
         description="The direction to attack from the position of the actor.",
     )
 
+    def __str__(self):
+        return f"AttackOrder by Actor {self.team}-{self.actor} -> {self.direction}"
+
 
 class MoveOrder(Order):
     actor: int = Field(
@@ -87,6 +97,9 @@ class MoveOrder(Order):
         title="Direction",
         description="The direction to move to from the position of the actor. 'up' increases the y coordinate and 'right' increases the x coordinate.",
     )
+
+    def __str__(self):
+        return f"MoveOrder by Actor {self.team}-{self.actor} -> {self.direction}"
 
 
 class GrabPutOrder(Order):
@@ -103,6 +116,9 @@ class GrabPutOrder(Order):
         ),
     )
 
+    def __str__(self):
+        return f"GrabPutOrder by Actor {self.team}-{self.actor} -> {self.direction}"
+
 
 class Team(BaseModel):
     name: str
@@ -115,6 +131,9 @@ class Team(BaseModel):
     def __hash__(self):
         return hash(self.name)
 
+    def __str__(self):
+        return f"Team {self.name}"
+
 
 class Actor(BaseModel, abc.ABC):
     type = "Base"
@@ -123,6 +142,9 @@ class Actor(BaseModel, abc.ABC):
     grab = 0.0
     attack = 0.0
     flag: int | None = None
+
+    def __str__(self):
+        return f"Actor ({self.type}) {self.team.name}-{self.ident}"
 
     def __eq__(self, another):
         return (
@@ -225,13 +247,11 @@ class Board:
             target_coordinates = random.choice(possible_spawn_points)
             if target_coordinates not in forbidden_positions:
                 if actor.flag is not None:
-                    self.logger.info(
-                        f"Actor {actor.team.name}-{actor.ident} dropped flag {actor.flag}."
-                    )
+                    self.logger.info(f"{actor} dropped flag {actor.flag}.")
                     actor.flag = None
                 self.actors_coordinates[actor] = target_coordinates
                 self.logger.info(
-                    f"Actor {actor.team.name}-{actor.ident} respawned to coordinates {target_coordinates}."
+                    f"{actor} respawned to coordinates {target_coordinates}."
                 )
                 break
 
@@ -256,28 +276,27 @@ class Board:
 
     def try_put_actor(self, actor: Actor, new_coordinates: Coordinates) -> bool:
         coordinates = self.actors_coordinates[actor]
+        moved = False
 
-        # check if position is already inhabited by an actor or base or wall
-        if (
-            self.coordinates_actors.get(new_coordinates)
-            or self.coordinates_bases.get(new_coordinates)
-            or new_coordinates in self.walls_coordinates
-        ):
-            self.logger.info(
-                f"Actor {actor.team.name}-{actor.ident} did not move. Target field is occupied or out of bounds."
-            )
-            return False
+        if coordinates == new_coordinates:
+            self.logger.info(f"{actor} did not move. Target field is out of bounds.")
+        elif self.coordinates_actors.get(new_coordinates) is not None:
+            self.logger.info(f"{actor} did not move. Target field is occupied.")
+        elif self.coordinates_bases.get(new_coordinates) is not None:
+            self.logger.info(f"{actor} did not move. Target field is abase.")
+        elif new_coordinates in self.walls_coordinates:
+            self.logger.info(f"{actor} did not move. Target field is a wall.")
+        else:
+            self.actors_coordinates[actor] = new_coordinates
+            moved = True
+            # move flag if actor has it
+            if actor.flag is not None:
+                flag = actor.flag
+                self.flags_coordinates[flag] = new_coordinates
 
-        self.actors_coordinates[actor] = new_coordinates
-        # move flag if actor has it
-        if actor.flag is not None:
-            flag = actor.flag
-            self.flags_coordinates[flag] = new_coordinates
+            self.logger.info(f"{actor} moved from {coordinates} to {new_coordinates}")
 
-        self.logger.info(
-            f"Actor {actor.team.name}-{actor.ident} moved from ({coordinates}) to ({new_coordinates})"
-        )
-        return True
+        return moved
 
     def image(self) -> str:
         field = [["___" for _ in range(self.map_size)] for _ in range(self.map_size)]
@@ -327,6 +346,7 @@ class Board:
                 starting_places.append(Coordinates(x=x, y=y))
         starting_places.remove(base)
         starting_places = starting_places[: len(actors)]
+        random.shuffle(starting_places)
         for actor, coordinates in zip(actors, starting_places):
             self.actors_coordinates[actor] = coordinates
 
@@ -425,13 +445,9 @@ class Game:
         if order.team in self.names_teams.keys():
             check = self.names_teams[order.team].password == order.password
             if not check:
-                self.logger.warning(
-                    f"Order {type(Order)} from team {Order.team} was ignored. Wrong password."
-                )
+                self.logger.warning(f"{order} was ignored. Wrong password.")
         else:
-            self.logger.warning(
-                f"Order {type(Order)} from team {Order.team} was ignored. Team unknown."
-            )
+            self.logger.warning(f"{order} was ignored. Team unknown.")
         return check
 
     def execute_game_step(self, orders: list[Order]) -> None:
@@ -462,117 +478,136 @@ class Game:
     def execute_move_orders(self, move_orders: list[MoveOrder]) -> None:
         already_moved = self.actor_dict(False)
         for order in move_orders:
+            bind_contextvars(team=order.team)
+            self.logger.info(f"Executing {order}")
             actor = self.teams_actors[(self.names_teams[order.team], order.actor)]
             direction = order.direction
-            if not already_moved[actor]:
+            if already_moved[actor]:
+                self.logger.warning(f"{actor} already moved this tick.")
+            else:
                 # if the actor can move
                 already_moved[actor] = self.board.move(actor, direction)
                 if already_moved[actor]:
                     self.check_flag_return_conditions(actor)
 
+        unbind_contextvars("team")
+
     def execute_attack_orders(self, attack_orders: list[AttackOrder]) -> None:
         already_attacked = self.actor_dict(False)
         for order in attack_orders:
+            bind_contextvars(team=order.team)
+            self.logger.info(f"Executing {order}")
             actor = self.teams_actors[(self.names_teams[order.team], order.actor)]
+            attack_successful = random.random() < actor.attack
 
-            # if the actor can not attack or the attack missed or it already attacked
-            if (attack_roll := random.random() < actor.attack) and (
-                not already_attacked[actor]
-            ):
-                direction = order.direction
-                target_coordinates = self.board.calc_target_coordinates(
-                    actor, direction
-                )
-                target = self.board.coordinates_actors.get(target_coordinates)
-                if target is not None:
-                    self.logger.info(
-                        f"Actor {actor.team.name}-{actor.ident} attacked and hit actor {target.team.name}-{target.ident}."
-                    )
-                    self.board.respawn(target)
-                    already_attacked[actor] = True
-
+            if already_attacked[actor]:
+                self.logger.warning(f"{actor} already attacked this tick.")
             else:
-                self.logger.info(
-                    f"Actor {actor.team.name}-{actor.ident} did not attack. Actor can not attack or missed."
-                )
+                if not actor.attack:
+                    self.logger.warning(f"{actor} can not attack.")
+                else:
+                    direction = order.direction
+                    target_coordinates = self.board.calc_target_coordinates(
+                        actor, direction
+                    )
+                    target = self.board.coordinates_actors.get(target_coordinates)
+                    if target is None:
+                        self.logger.warning(
+                            f"No target on target coordinates {target_coordinates}."
+                        )
+                    else:
+                        if not attack_successful:
+                            self.logger.info(f"{actor} attacked and missed {target}.")
+                        else:
+                            self.logger.info(f"{actor} attacked and hit {target}.")
+                            self.board.respawn(target)
+                            already_attacked[actor] = True
+
+        unbind_contextvars("team")
 
     def execute_grabput_orders(self, grabput_orders: list[GrabPutOrder]):
         already_grabbed = self.actor_dict(False)
         for order in grabput_orders:
+            bind_contextvars(team=order.team)
+            self.logger.info(f"Executing {order}")
             actor = self.teams_actors[(self.names_teams[order.team], order.actor)]
-            if (grab_roll := random.random() < actor.grab) and (
-                not already_grabbed[actor]
-            ):
+            if not already_grabbed[actor]:
                 target_coordinates = self.board.calc_target_coordinates(
                     actor, order.direction
                 )
 
                 already_grabbed[actor] = self.grabput_flag(actor, target_coordinates)
+            else:
+                self.logger.warning(f"{actor} already grabbed this tick.")
+        unbind_contextvars("team")
 
     def grabput_flag(self, actor: Actor, target_coordinates: Coordinates) -> bool:
+        grab_successful = random.random() < actor.grab
         target_actor = self.board.coordinates_actors.get(target_coordinates)
-        already_grabbed = True
-        # the actor does have the flag
+        already_grabbed = False
+
         if actor.flag is not None:
             flag = actor.flag
 
-            # if there is a target actor
             if target_actor is not None:
-                # target actor can not have the flag
                 if not target_actor.grab:
-                    already_grabbed = False
                     self.logger.warning(
-                        f"Actor {actor.team.name}-{actor.ident} can not hand the flag to actor {target_actor.team.name}-{target_actor.ident}. Can not have the flag."
+                        f"{actor} can not hand the flag to actor {target_actor}. Can not have the flag."
                     )
-                # target actor has the flag
+
                 elif target_actor.flag is not None:
-                    already_grabbed = False
                     self.logger.warning(
-                        f"Actor {actor.team.name}-{actor.ident} can not hand the flag to actor {target_actor.team.name}-{target_actor.ident}. Target already has a flag."
+                        f"{actor} can not hand the flag to actor {target_actor}. Target already has a flag."
                     )
-                #
+
                 else:
                     self.board.flags_coordinates[flag] = target_coordinates
                     actor.flag = None
                     target_actor.flag = flag
-                    self.logger.info(
-                        f"Actor {actor.team.name}-{actor.ident} handed the flag to actor {target_actor.team.name}-{target_actor.ident}."
-                    )
+                    already_grabbed = True
+                    self.logger.info(f"{actor} handed the flag to {target_actor}.")
                     self.check_flag_return_conditions(target_actor)
+
             # no target actor, means empty field, wall or base (even a flag???)
             else:
-                # if the target coordinates are a wall
                 if target_coordinates in self.board.walls_coordinates:
-                    already_grabbed = False
-                    self.logger.warning(
-                        f"Actor {actor.team.name}-{actor.ident} can not hand the flag to a wall."
-                    )
+                    self.logger.warning(f"{actor} can not hand the flag to a wall.")
 
                 # the flag was put on the field (maybe a base)
                 else:
                     self.board.flags_coordinates[flag] = target_coordinates
                     actor.flag = None
+                    already_grabbed = True
                     self.logger.info(
-                        f"Actor {actor.team.name}-{actor.ident} put the flag to coordinates {target_coordinates}."
+                        f"{actor} put the flag to coordinates {target_coordinates}."
                     )
                     self.check_score_conditions(flag)
 
         # the actor does not have the flag
         else:
-            # if the flag is at the target coordinates, grab it
-            if flag := self.board.coordinates_flags.get(target_coordinates) is not None:
-                self.board.flags_coordinates[flag] = self.board.actors_coordinates[
-                    actor
-                ]
-                actor.flag = flag
-
-                # and remove it from the target actor if there is one
-                if target_actor is not None:
-                    target_actor.flag = None
-
-            # if there is no flag at the destination, do nothing
+            flag = self.board.coordinates_flags.get(target_coordinates)
+            if flag is None:
+                self.logger.warning(f"No flag at coordinates {target_coordinates}.")
             else:
-                already_grabbed = False
+                if grab_successful:
+                    self.board.flags_coordinates[flag] = self.board.actors_coordinates[
+                        actor
+                    ]
+                    actor.flag = flag
+                    already_grabbed = True
+
+                    # and remove it from the target actor if there is one
+                    if target_actor is not None:
+                        target_actor.flag = None
+                        self.logger.info(
+                            f"{actor} grabbed the flag of {self.teams[flag]} from {target_actor}."
+                        )
+                    else:
+                        self.logger.info(
+                            f"{actor} grabbed the flag of {self.teams[flag]}."
+                        )
+                else:
+                    self.logger(f"{actor} grabbed and missed the flag.")
 
         return already_grabbed
 
@@ -585,7 +620,7 @@ class Game:
             and (flag != base)
             and self.board.flags_coordinates[base] == coordinates
         ):
-            self.logger.info(f"Team {self.teams[base]} scored {self.teams[flag]} flag!")
+            self.logger.info(f"{self.teams[base]} scored {self.teams[flag]} flag!")
             self.scores[base] += 1
             self.board.flags_coordinates[flag] = self.board.bases_coordinates[flag]
 
