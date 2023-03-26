@@ -394,6 +394,8 @@ class Game:
         self.time_of_next_execution = datetime.datetime.now()
         self.pregame_wait = pregame_wait
         self.tick = 0
+        self.max_ticks = MAX_TICKS
+        self.max_score = MAX_SCORE
 
     @property
     def time_to_next_execution(self) -> datetime.timedelta:
@@ -436,7 +438,7 @@ class Game:
 
         with open(self.score_file, "w") as score_file:
             for score in game_scores:
-                score_file.write(f"{score[0]}: {score[1]},")
+                score_file.write(f"{self.teams[score[0]]}: {score[1]}\n")
 
     def read_scores(self):
         try:
@@ -662,6 +664,11 @@ class Game:
                     self.logger(f"{actor} grabbed and missed the flag.")
 
         return already_grabbed
+
+    def check_game_end(self):
+        return (
+            self.tick == self.max_ticks or max(self.scores.values()) == self.max_score
+        )
 
     def check_score_conditions(self, flag: int) -> None:
         coordinates = self.board.flags_coordinates[flag]

@@ -431,9 +431,7 @@ async def routine():
     logger.info("Initiating game.")
     my_game.initiate_game()
 
-    while (
-        my_game.tick < game.MAX_TICKS and max(my_game.scores.values()) < game.MAX_SCORE
-    ):
+    while not my_game.check_game_end():
         await command_queue.put(SENTINEL)
 
         commands = await get_all_queue_items(command_queue)
@@ -455,6 +453,7 @@ async def routine():
         logger.info(f"Time of next execution: {next_execution}")
 
         await asyncio.sleep(WAIT_TIME)
+    my_game.end_game()
 
 
 async def get_all_queue_items(queue):
