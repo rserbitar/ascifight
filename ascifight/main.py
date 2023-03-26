@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ValidationError, Field
+from pydantic import BaseModel, Field
 import logging
 import structlog
 from structlog.contextvars import bind_contextvars
@@ -11,21 +11,12 @@ import os
 
 import game
 
-# structlog.configure(
-#     processors=[
-#         structlog.contextvars.merge_contextvars,
-#         structlog.processors.add_log_level,
-#         structlog.processors.StackInfoRenderer(),
-#         structlog.dev.set_exc_info,
-#         structlog.processors.TimeStamper(),
-#         structlog.dev.ConsoleRenderer(),
-#     ],
-#     context_class=dict,
-#     wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
-#     logger_factory=structlog.PrintLoggerFactory(),
-#     cache_logger_on_first_use=False,
-# )
 
+WAIT_TIME = 5
+PREGAME_WAIT = 3
+LOG_DIR = "logs"
+
+SENTINEL = object()
 
 time_stamper = structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S.%f", utc=False)
 pre_chain = [
@@ -112,12 +103,6 @@ for handler in root_logger.handlers:
 
 logger = structlog.get_logger()
 
-
-WAIT_TIME = 5
-PREGAME_WAIT = 3
-LOG_DIR = "logs"
-
-SENTINEL = object()
 
 description = """
 **ASCI-Fight** allows you to fight with your teammates in style.
@@ -217,7 +202,7 @@ This section is static per game and tells you what each actor can do, what the m
 
 ### Game Timing
 
-The current tick and when the next tick executes. This is more lightweight than the _Game State_ an can be queried often. 
+The current tick and when the next tick executes both on absolute time and time-deltas. This is more lightweight than the _Game State_ an can be queried often. 
 
 ### Game Start
 

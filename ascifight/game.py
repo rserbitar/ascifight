@@ -378,16 +378,19 @@ class Game:
         board: Board,
         teams: list[Team],
         actors: InitialActorsList,
+        score_file="scores.log",
+        score_multiplier=1,
     ) -> None:
         self.logger = structlog.get_logger()
-
+        self.score_file = score_file
+        self.score_multiplier = score_multiplier
         self.actors = actors.actors
         self.board = board
         self.teams: list[str] = [team.name for team in teams]
         self.names_teams: dict[str, Team] = {team.name: team for team in teams}
         self.teams_actors: dict[tuple[Team, int], Actor] = {}
         self.scores: dict[int, int] = {}
-
+        self.overall_score: dict[int, int] = {}
         self.time_of_next_execution = datetime.datetime.now()
         self.pregame_wait = pregame_wait
         self.tick = 0
@@ -408,20 +411,65 @@ class Game:
 
     def initiate_game(self) -> None:
         self.set_scores()
+        self.read_scores()
         self.create_team_actors()
         self.place_actors_and_bases()
+
+    def end_game(self):
+        self.write_scores()
 
     def set_scores(self) -> None:
         for i in range(len(self.names_teams)):
             self.scores[i] = 0
+        for i in range(len(self.names_teams)):
+            self.overall_score[i] = 0
+
+    def write_scores(self):
+        game_scores = []
+        scores = list(self.scores.items())
+        sorted(scores, key=lambda x: x[1], reverse=True)
+        if scores[0][1] == scores[1][1]:
+            tied_teams = [team for team, value in scores if value == scores[0][1]]
+            game_scores = [(team, 1 * self.score_multiplier) for team in tied_teams]
+        else:
+            game_scores = [(scores[0][0], 3 * self.score_multiplier)]
+
+        with open(self.score_file, "w") as score_file:
+            for score in game_scores:
+                score_file.write(f"{score[0]}: {score[1]},")
+
+    def read_scores(self):
+        try:
+            with open(self.score_file, "r") as score_file:
+                for line in score_file:
+                    team, score = line.split(":")
+                    score = int(score)
+                    team = team.strip()
+                    try:
+                        self.overall_score[self.teams.index(team)] += score
+                    # ignore score if team is not in current teams
+                    except ValueError:
+                        pass
+        # if the file is not yet there assume default scores
+        except FileNotFoundError:
+            pass
 
     def scoreboard(self) -> str:
-        return " - ".join(
+        current_score = " - ".join(
             [
                 f"{colors[i]}{name}: {score}{colors['revert']}"
                 for i, (name, score) in enumerate(zip(self.teams, self.scores.values()))
             ]
         )
+        overall_score = " - ".join(
+            [
+                f"{colors[i]}{name}: {score}{colors['revert']}"
+                for i, (name, score) in enumerate(
+                    zip(self.teams, self.overall_score.values())
+                )
+            ]
+        )
+        return f"{colors['bold']}Overall Score{colors['revert']}: {overall_score} \n{colors['bold']}Current Score{colors['revert']}: {current_score}"
 
     def place_actors_and_bases(self) -> None:
         self.board.place_bases(len(self.names_teams))
