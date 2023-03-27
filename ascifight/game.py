@@ -279,13 +279,13 @@ class Board:
         moved = False
 
         if coordinates == new_coordinates:
-            self.logger.info(f"{actor} did not move. Target field is out of bounds.")
+            self.logger.warning(f"{actor} did not move. Target field is out of bounds.")
         elif self.coordinates_actors.get(new_coordinates) is not None:
-            self.logger.info(f"{actor} did not move. Target field is occupied.")
+            self.logger.warning(f"{actor} did not move. Target field is occupied.")
         elif self.coordinates_bases.get(new_coordinates) is not None:
-            self.logger.info(f"{actor} did not move. Target field is abase.")
+            self.logger.warning(f"{actor} did not move. Target field is abase.")
         elif new_coordinates in self.walls_coordinates:
-            self.logger.info(f"{actor} did not move. Target field is a wall.")
+            self.logger.warning(f"{actor} did not move. Target field is a wall.")
         else:
             self.actors_coordinates[actor] = new_coordinates
             moved = True
@@ -659,7 +659,7 @@ class Game:
                             f"{actor} grabbed the flag of {self.teams[flag]}."
                         )
                 else:
-                    self.logger(f"{actor} grabbed and missed the flag.")
+                    self.logger.info(f"{actor} grabbed and missed the flag.")
 
         return already_grabbed
 
