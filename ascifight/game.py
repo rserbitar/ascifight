@@ -10,7 +10,7 @@ import abc
 
 MAP_SIZE = 15
 MAX_SCORE = 3
-MAX_TICKS = 10
+MAX_TICKS = 200
 ACTOR_NUM = 1
 
 
@@ -188,7 +188,7 @@ class Board:
         self.map_size = MAP_SIZE
         self.walls = walls
 
-        self.logger = logger = structlog.get_logger()
+        self.logger = structlog.get_logger()
         self.actors_coordinates: dict[Actor, Coordinates] = {}
         self.flags_coordinates: dict[int, Coordinates] = {}
         self.bases_coordinates: dict[int, Coordinates] = {}
@@ -429,14 +429,14 @@ class Game:
     def write_scores(self):
         game_scores = []
         scores = list(self.scores.items())
-        sorted(scores, key=lambda x: x[1], reverse=True)
+        scores = sorted(scores, key=lambda x: x[1], reverse=True)
         if scores[0][1] == scores[1][1]:
             tied_teams = [team for team, value in scores if value == scores[0][1]]
             game_scores = [(team, 1 * self.score_multiplier) for team in tied_teams]
         else:
             game_scores = [(scores[0][0], 3 * self.score_multiplier)]
 
-        with open(self.score_file, "w") as score_file:
+        with open(self.score_file, "a") as score_file:
             for score in game_scores:
                 score_file.write(f"{self.teams[score[0]]}: {score[1]}\n")
 
@@ -459,16 +459,14 @@ class Game:
     def scoreboard(self) -> str:
         current_score = " - ".join(
             [
-                f"{colors[i]}{name}: {score}{colors['revert']}"
-                for i, (name, score) in enumerate(zip(self.teams, self.scores.values()))
+                f"{colors[i]}{self.teams[i]}: {score}{colors['revert']}"
+                for i, score in self.scores.items()
             ]
         )
         overall_score = " - ".join(
             [
-                f"{colors[i]}{name}: {score}{colors['revert']}"
-                for i, (name, score) in enumerate(
-                    zip(self.teams, self.overall_score.values())
-                )
+                f"{colors[i]}{self.teams[i]}: {score}{colors['revert']}"
+                for i, score in self.overall_score.items()
             ]
         )
         return f"{colors['bold']}Overall Score{colors['revert']}: {overall_score} \n{colors['bold']}Current Score{colors['revert']}: {current_score}"
@@ -675,7 +673,7 @@ class Game:
         base = self.board.coordinates_bases.get(coordinates)
         # if the flag is an enemy flag and owner flag is also there
         if (
-            base
+            base is not None
             and (flag != base)
             and self.board.flags_coordinates[base] == coordinates
         ):
