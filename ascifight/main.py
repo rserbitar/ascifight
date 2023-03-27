@@ -393,36 +393,41 @@ teams = [
     game.Team(name="M", password="1", number=2),
 ]
 
-my_game = game.Game(
-    teams=teams,
-    pregame_wait=PREGAME_WAIT,
-    board=game.Board(walls=0),
-    actors=game.InitialActorsList(actors=[game.Generalist]),
-)
-
-
-# game = Game(teams=teams, pregame_wait = PREGAME_WAIT,
-#     board=Board(walls=0),
-#     actors=InitialActorsList(actors=[game.Generalist, game.Generalist, game.Generalist]),
-# )
-
-# game = Game(teams=teams, pregame_wait = PREGAME_WAIT,
-#     board=Board(walls=0),
-#     actors=InitialActorsList(actors=[game.Runner, game.Attacker, game.Attacker]),
-# )
-
-# game = Game(teams=teams, pregame_wait = PREGAME_WAIT,
-#     board=Board(walls=10),
-#     actors=InitialActorsList(actors=[game.Runner, game.Attacker, game.Attacker]),
-# )
-
-# game = Game(teams=teams, pregame_wait = PREGAME_WAIT,
-#     board=Board(walls=10),
-#     actors=InitialActorsList(actors=[game.Runner, game.Attacker, game.Attacker, game.Blocker, game.Blocker]),
-# )
+my_game: game.Game
 
 
 async def routine():
+    while True:
+        await single_game()
+
+
+async def single_game():
+    global my_game
+    my_game = game.Game(
+        teams=teams,
+        pregame_wait=PREGAME_WAIT,
+        board=game.Board(walls=0),
+        actors=game.InitialActorsList(actors=[game.Generalist]),
+    )
+    # my_game = Game(teams=teams, pregame_wait = PREGAME_WAIT,
+    #     board=Board(walls=0),
+    #     actors=InitialActorsList(actors=[game.Generalist, game.Generalist, game.Generalist]),
+    # )
+
+    # my_game = Game(teams=teams, pregame_wait = PREGAME_WAIT,
+    #     board=Board(walls=0),
+    #     actors=InitialActorsList(actors=[game.Runner, game.Attacker, game.Attacker]),
+    # )
+
+    # my_game = Game(teams=teams, pregame_wait = PREGAME_WAIT,
+    #     board=Board(walls=10),
+    #     actors=InitialActorsList(actors=[game.Runner, game.Attacker, game.Attacker]),
+    # )
+
+    # my_game = Game(teams=teams, pregame_wait = PREGAME_WAIT,
+    #     board=Board(walls=10),
+    #     actors=InitialActorsList(actors=[game.Runner, game.Attacker, game.Attacker, game.Blocker, game.Blocker]),
+    # )
     logger.info("Starting pre-game.")
     while my_game.pregame_wait > 0:
         await asyncio.sleep(1)
@@ -454,6 +459,9 @@ async def routine():
 
         await asyncio.sleep(WAIT_TIME)
     my_game.end_game()
+    os.system("cls" if os.name == "nt" else "clear")
+    print(my_game.scoreboard())
+    print(my_game.board.image())
 
 
 async def get_all_queue_items(queue):

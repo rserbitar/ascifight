@@ -10,7 +10,7 @@ import abc
 
 MAP_SIZE = 15
 MAX_SCORE = 3
-MAX_TICKS = 200
+MAX_TICKS = 10
 ACTOR_NUM = 1
 
 
