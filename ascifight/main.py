@@ -198,7 +198,7 @@ This gets you the current state of the game. The position of each game component
 
 ### Game Rules
 
-This section is static per game and tells you what each actor can do, what the maximum score or tick number is and other static information.
+This section is static per game and tells you what each actor can do, if the flag needs to be at home to score, what the maximum score or tick number is and other static information.
 
 ### Game Timing
 
