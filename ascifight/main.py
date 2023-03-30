@@ -96,11 +96,6 @@ structlog.configure(
 )
 
 root_logger = logging.getLogger()
-
-for handler in root_logger.handlers:
-    if handler.__class__.__name__ == "RotatingFileHandler":
-        handler.doRollover()
-
 logger = structlog.get_logger()
 
 
@@ -407,6 +402,9 @@ async def routine():
 
 async def single_game():
     global my_game
+    for handler in root_logger.handlers:
+        if handler.__class__.__name__ == "RotatingFileHandler":
+            handler.doRollover()
     my_game = game.Game(
         teams=teams,
         pregame_wait=PREGAME_WAIT,
