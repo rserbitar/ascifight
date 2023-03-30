@@ -10,8 +10,9 @@ import abc
 
 MAP_SIZE = 15
 MAX_SCORE = 3
-MAX_TICKS = 200
+MAX_TICKS = 1000
 ACTOR_NUM = 1
+HOME_FLAG_REQUIRED = True
 
 
 colors = {
@@ -668,18 +669,33 @@ class Game:
             self.tick == self.max_ticks or max(self.scores.values()) == self.max_score
         )
 
-    def check_score_conditions(self, flag: int) -> None:
-        coordinates = self.board.flags_coordinates[flag]
-        base = self.board.coordinates_bases.get(coordinates)
-        # if the flag is an enemy flag and owner flag is also there
-        if (
-            base is not None
-            and (flag != base)
-            and self.board.flags_coordinates[base] == coordinates
-        ):
-            self.logger.info(f"{self.teams[base]} scored {self.teams[flag]} flag!")
-            self.scores[base] += 1
-            self.board.flags_coordinates[flag] = self.board.bases_coordinates[flag]
+    def check_score_conditions(self, flag: int | None = None) -> None:
+        flags = (
+            [flag] if flag else [flag for flag in self.board.flags_coordinates.keys()]
+        )
+        for flag in flags:
+            coordinates = self.board.flags_coordinates[flag]
+            base = self.board.coordinates_bases.get(coordinates)
+            # if the flag is an enemy flag and owner flag is also there
+            if (
+                # flag is on a base
+                base is not None
+                # flag is not on it own base
+                and (flag != base)
+            ):
+                # own flag is at base or this is not required
+                if (self.board.flags_coordinates[base] == coordinates) or (
+                    not HOME_FLAG_REQUIRED
+                ):
+                    self.logger.info(
+                        f"{self.teams[base]} scored {self.teams[flag]} flag!"
+                    )
+                    self.scores[base] += 1
+                    self.board.flags_coordinates[flag] = self.board.bases_coordinates[
+                        flag
+                    ]
+                else:
+                    self.logger.warning("Can not score, flag not at home.")
 
     def check_flag_return_conditions(self, actor: Actor) -> None:
         coordinates = self.board.actors_coordinates[actor]
@@ -688,3 +704,4 @@ class Game:
             # if flag is own flag, return it to base
             if flag == actor.team.number:
                 self.board.flags_coordinates[flag] = self.board.bases_coordinates[flag]
+                self.check_score_conditions()

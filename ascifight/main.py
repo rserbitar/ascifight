@@ -308,6 +308,10 @@ class RulesResponse(BaseModel):
         default=game.MAX_SCORE,
         description="The maximum score that will force the game to end.",
     )
+    home_Flag_not_required: bool = Field(
+        default=game.HOME_FLAG_REQUIRED,
+        description="Is the flag required to be at home to score? ",
+    )
     actor_types: list[ActorProperty]
 
 
@@ -409,6 +413,7 @@ async def single_game():
         board=game.Board(walls=0),
         actors=game.InitialActorsList(actors=[game.Generalist]),
     )
+
     # my_game = Game(teams=teams, pregame_wait = PREGAME_WAIT,
     #     board=Board(walls=0),
     #     actors=InitialActorsList(actors=[game.Generalist, game.Generalist, game.Generalist]),
@@ -428,6 +433,7 @@ async def single_game():
     #     board=Board(walls=10),
     #     actors=InitialActorsList(actors=[game.Runner, game.Attacker, game.Attacker, game.Blocker, game.Blocker]),
     # )
+
     logger.info("Starting pre-game.")
     while my_game.pregame_wait > 0:
         await asyncio.sleep(1)
@@ -491,4 +497,4 @@ async def ai_generator():
 @app.on_event("startup")
 async def startup():
     asyncio.create_task(routine())
-    asyncio.create_task(ai_generator())
+    # asyncio.create_task(ai_generator())
