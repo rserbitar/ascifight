@@ -658,6 +658,7 @@ class Game:
                         self.logger.info(
                             f"{actor} grabbed the flag of {self.teams[flag]}."
                         )
+                    self.check_flag_return_conditions(actor=actor)
                 else:
                     self.logger.info(f"{actor} grabbed and missed the flag.")
 
@@ -704,3 +705,5 @@ class Game:
             if flag == actor.team.number:
                 self.board.flags_coordinates[flag] = self.board.bases_coordinates[flag]
                 self.check_score_conditions()
+                if actor.flag:
+                    actor.flag = None
