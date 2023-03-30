@@ -433,14 +433,13 @@ async def single_game():
     #     board=Board(walls=10),
     #     actors=InitialActorsList(actors=[game.Runner, game.Attacker, game.Attacker, game.Blocker, game.Blocker]),
     # )
+    logger.info("Initiating game.")
+    my_game.initiate_game()
 
     logger.info("Starting pre-game.")
     while my_game.pregame_wait > 0:
         await asyncio.sleep(1)
         my_game.pregame_wait -= 1
-
-    logger.info("Initiating game.")
-    my_game.initiate_game()
 
     while not my_game.check_game_end():
         await command_queue.put(SENTINEL)
