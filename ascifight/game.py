@@ -244,17 +244,16 @@ class Board:
         possible_spawn_points: list[Coordinates],
         forbidden_positions: set[Coordinates],
     ) -> None:
-        while True:
-            target_coordinates = random.choice(possible_spawn_points)
-            if target_coordinates not in forbidden_positions:
-                if actor.flag is not None:
-                    self.logger.info(f"{actor} dropped flag {actor.flag}.")
-                    actor.flag = None
-                self.actors_coordinates[actor] = target_coordinates
-                self.logger.info(
-                    f"{actor} respawned to coordinates {target_coordinates}."
-                )
-                break
+        allowed_positions = set(possible_spawn_points) - set(forbidden_positions)
+        target_coordinates = random.choice(list(allowed_positions))
+        if actor.flag is not None:
+            self.logger.info(f"{actor} dropped flag {actor.flag}.")
+            actor.flag = None
+        self.actors_coordinates[actor] = target_coordinates
+        self.logger.info(
+            f"{actor} respawned to coordinates {target_coordinates}."
+        )
+
 
     def calc_target_coordinates(
         self, actor: Actor, direction: Directions
