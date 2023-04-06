@@ -297,8 +297,11 @@ class Board:
             field[base.y][base.x] = f" {colors[i]}\u25D9{colors['revert']} "
         for actor, coordinates in self.actors_coordinates.items():
             char = actor.type[0].upper()
+            number = actor.ident
             color = colors[actor.team.number]
-            field[coordinates.y][coordinates.x] = f" {color}{char}{colors['revert']} "
+            field[coordinates.y][
+                coordinates.x
+            ] = f"{color}{char}{number}{colors['revert']} "
         for flag, coordinates in self.flags_coordinates.items():
             color = colors[flag]
             before = field[coordinates.y][coordinates.x]
@@ -367,7 +370,6 @@ class Game:
     def __init__(
         self,
         board: Board,
-        pregame_wait: int = config["server"]["pre_game_wait"],
         teams: list[dict[str, str]] = config["teams"],
         actors: list[str] = config["game"]["actors"],
         score_file=config["server"]["scores_file"],
@@ -388,15 +390,9 @@ class Game:
         self.teams_actors: dict[tuple[Team, int], Actor] = {}
         self.scores: dict[int, int] = {}
         self.overall_score: dict[int, int] = {}
-        self.time_of_next_execution = datetime.datetime.now()
-        self.pregame_wait = pregame_wait
         self.tick = 0
         self.max_ticks = max_ticks
         self.max_score = max_score
-
-    @property
-    def time_to_next_execution(self) -> datetime.timedelta:
-        return self.time_of_next_execution - datetime.datetime.now()
 
     @property
     def actors_of_team(self) -> dict[str, list[Actor]]:
@@ -409,10 +405,10 @@ class Game:
         return actors_of_team
 
     def initiate_game(self) -> None:
-        self.set_scores()
-        self.read_scores()
-        self.create_team_actors()
-        self.place_actors_and_bases()
+        self._set_scores()
+        self._read_scores()
+        self._create_team_actors()
+        self._place_actors_and_bases()
 
     def end_game(self):
         self.write_scores()
@@ -420,7 +416,7 @@ class Game:
     def get_actor(self, actor: str) -> type[Actor]:
         return getattr(sys.modules[__name__], actor)
 
-    def set_scores(self) -> None:
+    def _set_scores(self) -> None:
         for i in range(len(self.names_teams)):
             self.scores[i] = 0
         for i in range(len(self.names_teams)):
@@ -440,7 +436,7 @@ class Game:
             for score in game_scores:
                 score_file.write(f"{self.teams[score[0]]}: {score[1]}\n")
 
-    def read_scores(self):
+    def _read_scores(self):
         try:
             with open(self.score_file, "r") as score_file:
                 for line in score_file:
@@ -471,7 +467,7 @@ class Game:
         )
         return f"{colors['bold']}Overall Score{colors['revert']}: {overall_score} \n{colors['bold']}Current Score{colors['revert']}: {current_score}"
 
-    def place_actors_and_bases(self) -> None:
+    def _place_actors_and_bases(self) -> None:
         self.board.place_bases(len(self.names_teams))
         for p, team in enumerate(self.names_teams.values()):
             coordinates = self.board.bases_coordinates[p]
@@ -481,7 +477,7 @@ class Game:
                 self.board.place_actors(actors, coordinates)
         self.board.place_walls()
 
-    def create_team_actors(self) -> None:
+    def _create_team_actors(self) -> None:
         for team in self.names_teams.values():
             for number, actor in enumerate(self.actors):
                 self.teams_actors[(team, number)] = actor(ident=number, team=team)

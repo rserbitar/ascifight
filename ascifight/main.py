@@ -15,8 +15,6 @@ import game
 with open("config.toml", mode="r") as fp:
     config = toml.load(fp)
 
-SENTINEL = object()
-
 time_stamper = structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S.%f", utc=False)
 pre_chain = [
     # Add the log level and a timestamp to the event_dict if the log entry
@@ -227,21 +225,6 @@ tags_metadata = [
     },
 ]
 
-app = FastAPI(
-    openapi_tags=tags_metadata,
-    title="A Social, Community Increasing - Fight",
-    description=description,
-    version="0.1",
-    contact={
-        "name": "Ralf Kelzenberg",
-        "url": "http://vodafone.com",
-        "email": "Ralf.Kelzenberg@vodafone.com",
-    },
-)
-app.mount("/logs", StaticFiles(directory=config["server"]["log_dir"]), name="logs")
-
-command_queue: asyncio.Queue[game.Order | object] = asyncio.Queue()
-
 
 class ActorDescriptions(BaseModel):
     team: str = Field(description="The name of the actor's team.")
@@ -316,6 +299,27 @@ class RulesResponse(BaseModel):
     actor_types: list[ActorProperty]
 
 
+app = FastAPI(
+    openapi_tags=tags_metadata,
+    title="A Social, Community Increasing - Fight",
+    description=description,
+    version="0.1",
+    contact={
+        "name": "Ralf Kelzenberg",
+        "url": "http://vodafone.com",
+        "email": "Ralf.Kelzenberg@vodafone.com",
+    },
+)
+app.mount("/logs", StaticFiles(directory=config["server"]["log_dir"]), name="logs")
+
+SENTINEL = object()
+time_to_next_execution: datetime.timedelta
+time_of_next_execution: datetime.datetime
+pre_game_wait: int
+my_game: game.Game
+command_queue: asyncio.Queue[game.Order | object] = asyncio.Queue()
+
+
 @app.post("/move_order", tags=["orders"])
 async def move_order(order: game.MoveOrder):
     """Move an actor into a direction. Moving over your own flag return it to the base."""
@@ -356,7 +360,7 @@ async def get_game_state() -> StateResponse:
         walls=list(my_game.board.walls_coordinates),
         scores=list(my_game.scores.values()),
         tick=my_game.tick,
-        time_of_next_execution=my_game.time_of_next_execution,
+        time_of_next_execution=time_of_next_execution,
     )
 
 
@@ -375,15 +379,15 @@ async def get_timing() -> TimingResponse:
     """Get the current tick and time of next execution."""
     return TimingResponse(
         tick=my_game.tick,
-        time_to_next_execution=my_game.time_to_next_execution,
-        time_of_next_execution=my_game.time_of_next_execution,
+        time_to_next_execution=time_of_next_execution - datetime.datetime.now(),
+        time_of_next_execution=time_of_next_execution,
     )
 
 
 @app.get("/game_start", tags=["states"])
 async def get_game_start() -> int:
     """Return the seconds till the game will start."""
-    return my_game.pregame_wait
+    return pre_game_wait
 
 
 @app.get("/log_files", tags=["states"])
@@ -392,22 +396,18 @@ async def get_log_files() -> list[str]:
     return os.listdir(config["server"]["log_dir"])
 
 
-teams = [
-    game.Team(name="S", password="1", number=0),
-    game.Team(name="G", password="1", number=1),
-    game.Team(name="M", password="1", number=2),
-]
-
-my_game: game.Game
-
-
 async def routine():
     while True:
         await single_game()
 
 
-async def single_game():
+async def single_game() -> None:
     global my_game
+    global pre_game_wait
+    global time_of_next_execution
+    global time_to_next_execution
+
+    pre_game_wait = config["server"]["pre_game_wait"]
     for handler in root_logger.handlers:
         if isinstance(handler, logging.handlers.RotatingFileHandler):
             handler.doRollover()
@@ -417,9 +417,9 @@ async def single_game():
     my_game.initiate_game()
 
     logger.info("Starting pre-game.")
-    while my_game.pregame_wait > 0:
+    while pre_game_wait > 0:
         await asyncio.sleep(1)
-        my_game.pregame_wait -= 1
+        pre_game_wait -= 1
 
     while not my_game.check_game_end():
         await command_queue.put(SENTINEL)
@@ -436,11 +436,10 @@ async def single_game():
         my_game.execute_game_step(commands)
 
         logger.info("Waiting for game commands.")
-        my_game.time_of_next_execution = datetime.datetime.now() + datetime.timedelta(
+        time_of_next_execution = datetime.datetime.now() + datetime.timedelta(
             0, config["server"]["tick_wait_time"]
         )
-        next_execution = my_game.time_of_next_execution
-        logger.info(f"Time of next execution: {next_execution}")
+        logger.info(f"Time of next execution: {time_of_next_execution}")
 
         await asyncio.sleep(config["server"]["tick_wait_time"])
     my_game.end_game()
