@@ -1,13 +1,14 @@
+import datetime
+import logging, logging.config, logging.handlers
+import asyncio
+import os
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-import logging, logging.config, logging.handlers
 import structlog
 from structlog.contextvars import bind_contextvars
 import toml
-import datetime
-import asyncio
-import os
 
 import game
 
