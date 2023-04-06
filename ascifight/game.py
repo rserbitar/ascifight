@@ -7,13 +7,12 @@ import enum
 import itertools
 import random
 import abc
+import toml
+import sys
 
-MAP_SIZE = 15
-MAX_SCORE = 3
-MAX_TICKS = 1000
-ACTOR_NUM = 1
-HOME_FLAG_REQUIRED = True
 
+with open("config.toml", mode="r") as fp:
+    config = toml.load(fp)
 
 colors = {
     0: "\u001b[31m",
@@ -50,15 +49,15 @@ class Coordinates(BaseModel):
     x: int = Field(
         description="X coordinate is decreased by the 'left' and increased by the 'right' direction.",
         ge=0,
-        le=MAP_SIZE - 1,
+        le=config["game"]["map_size"] - 1,
     )
     y: int = Field(
         description="Y coordinate is decreased by the 'down' and increased by the 'up' direction.",
         ge=0,
-        le=MAP_SIZE - 1,
+        le=config["game"]["map_size"] - 1,
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"({self.x}/{self.y})"
 
     def __eq__(self, another):
@@ -69,7 +68,7 @@ class Coordinates(BaseModel):
             and self.y == another.y
         )
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash((self.x, self.y))
 
 
@@ -77,7 +76,7 @@ class AttackOrder(Order):
     actor: int = Field(
         description="The id of the actor, specific to the team.",
         ge=0,
-        le=ACTOR_NUM - 1,
+        le=len(config["game"]["actors"]) - 1,
     )
     direction: Directions = Field(
         title="Direction",
@@ -92,7 +91,7 @@ class MoveOrder(Order):
     actor: int = Field(
         description="The id of the actor, specific to the team.",
         ge=0,
-        le=ACTOR_NUM - 1,
+        le=len(config["game"]["actors"]) - 1,
     )
     direction: Directions = Field(
         title="Direction",
@@ -108,7 +107,7 @@ class GrabPutOrder(Order):
         title="Actor",
         description="The id of the actor, specific to the team.",
         ge=0,
-        le=ACTOR_NUM - 1,
+        le=len(config["game"]["actors"]) - 1,
     )
     direction: Directions = Field(
         title="Direction",
@@ -179,14 +178,10 @@ class Blocker(Actor):
     type = "Blocker"
 
 
-class InitialActorsList(BaseModel):
-    actors: list[type[Actor]] = Field(min_items=ACTOR_NUM, max_items=ACTOR_NUM)
-
-
 class Board:
     def __init__(self, walls=0) -> None:
         self.logger = structlog.get_logger()
-        self.map_size = MAP_SIZE
+        self.map_size = config["game"]["map_size"]
         self.walls = walls
 
         self.logger = structlog.get_logger()
@@ -250,10 +245,7 @@ class Board:
             self.logger.info(f"{actor} dropped flag {actor.flag}.")
             actor.flag = None
         self.actors_coordinates[actor] = target_coordinates
-        self.logger.info(
-            f"{actor} respawned to coordinates {target_coordinates}."
-        )
-
+        self.logger.info(f"{actor} respawned to coordinates {target_coordinates}.")
 
     def calc_target_coordinates(
         self, actor: Actor, direction: Directions
@@ -374,28 +366,33 @@ class Board:
 class Game:
     def __init__(
         self,
-        pregame_wait: int,
         board: Board,
-        teams: list[Team],
-        actors: InitialActorsList,
-        score_file="scores.log",
-        score_multiplier=1,
+        pregame_wait: int = config["server"]["pre_game_wait"],
+        teams: list[dict[str, str]] = config["teams"],
+        actors: list[str] = config["game"]["actors"],
+        score_file=config["server"]["scores_file"],
+        score_multiplier: int = config["game"]["score_multiplier"],
+        max_ticks: int = config["game"]["max_ticks"],
+        max_score: int = config["game"]["max_score"],
     ) -> None:
         self.logger = structlog.get_logger()
         self.score_file = score_file
         self.score_multiplier = score_multiplier
-        self.actors = actors.actors
+        self.actors: list[type[Actor]] = [self.get_actor(actor) for actor in actors]
         self.board = board
-        self.teams: list[str] = [team.name for team in teams]
-        self.names_teams: dict[str, Team] = {team.name: team for team in teams}
+        self.teams: list[str] = [team["name"] for team in teams]
+        self.names_teams: dict[str, Team] = {
+            team["name"]: Team(name=team["name"], password=team["password"], number=i)
+            for i, team in enumerate(teams)
+        }
         self.teams_actors: dict[tuple[Team, int], Actor] = {}
         self.scores: dict[int, int] = {}
         self.overall_score: dict[int, int] = {}
         self.time_of_next_execution = datetime.datetime.now()
         self.pregame_wait = pregame_wait
         self.tick = 0
-        self.max_ticks = MAX_TICKS
-        self.max_score = MAX_SCORE
+        self.max_ticks = max_ticks
+        self.max_score = max_score
 
     @property
     def time_to_next_execution(self) -> datetime.timedelta:
@@ -419,6 +416,9 @@ class Game:
 
     def end_game(self):
         self.write_scores()
+
+    def get_actor(self, actor: str) -> type[Actor]:
+        return getattr(sys.modules[__name__], actor)
 
     def set_scores(self) -> None:
         for i in range(len(self.names_teams)):
@@ -686,7 +686,7 @@ class Game:
             ):
                 # own flag is at base or this is not required
                 if (self.board.flags_coordinates[base] == coordinates) or (
-                    not HOME_FLAG_REQUIRED
+                    not config["game"]["home_flag_required"]
                 ):
                     self.logger.info(
                         f"{self.teams[base]} scored {self.teams[flag]} flag!"

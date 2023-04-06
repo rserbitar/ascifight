@@ -4,17 +4,15 @@ from pydantic import BaseModel, Field
 import logging, logging.config, logging.handlers
 import structlog
 from structlog.contextvars import bind_contextvars
-
+import toml
 import datetime
 import asyncio
 import os
 
 import game
 
-
-WAIT_TIME = 5
-PREGAME_WAIT = 3
-LOG_DIR = "logs"
+with open("config.toml", mode="r") as fp:
+    config = toml.load(fp)
 
 SENTINEL = object()
 
@@ -30,57 +28,63 @@ pre_chain = [
     time_stamper,
 ]
 
+config_dict = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "plain": {
+            "()": structlog.stdlib.ProcessorFormatter,
+            "processors": [
+                structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+                structlog.contextvars.merge_contextvars,
+                structlog.processors.JSONRenderer(sort_keys=True),
+            ],
+            "foreign_pre_chain": pre_chain,
+        },
+        "colored": {
+            "()": structlog.stdlib.ProcessorFormatter,
+            "processors": [
+                structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+                structlog.contextvars.merge_contextvars,
+                structlog.processors.add_log_level,
+                structlog.processors.StackInfoRenderer(),
+                structlog.dev.set_exc_info,
+                structlog.dev.ConsoleRenderer(colors=True),
+            ],
+            "foreign_pre_chain": pre_chain,
+        },
+    },
+    "handlers": {
+        "default": {
+            "level": "DEBUG",
+            "class": "logging.StreamHandler",
+            "formatter": "colored",
+        },
+        "file": {
+            "level": "DEBUG",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": f"{config['server']['log_dir']}/game.log",
+            "backupCount": 100,
+            "formatter": "plain",
+        },
+    },
+    "loggers": {
+        "": {
+            "handlers": ["default", "file"],
+            "level": "DEBUG",
+            "propagate": True,
+        },
+    },
+}
 
-logging.config.dictConfig(
-    {
-        "version": 1,
-        "disable_existing_loggers": False,
-        "formatters": {
-            "plain": {
-                "()": structlog.stdlib.ProcessorFormatter,
-                "processors": [
-                    structlog.stdlib.ProcessorFormatter.remove_processors_meta,
-                    structlog.contextvars.merge_contextvars,
-                    structlog.processors.JSONRenderer(sort_keys=True),
-                ],
-                "foreign_pre_chain": pre_chain,
-            },
-            "colored": {
-                "()": structlog.stdlib.ProcessorFormatter,
-                "processors": [
-                    structlog.stdlib.ProcessorFormatter.remove_processors_meta,
-                    structlog.contextvars.merge_contextvars,
-                    structlog.processors.add_log_level,
-                    structlog.processors.StackInfoRenderer(),
-                    structlog.dev.set_exc_info,
-                    structlog.dev.ConsoleRenderer(colors=True),
-                ],
-                "foreign_pre_chain": pre_chain,
-            },
-        },
-        "handlers": {
-            "default": {
-                "level": "DEBUG",
-                "class": "logging.StreamHandler",
-                "formatter": "colored",
-            },
-            "file": {
-                "level": "DEBUG",
-                "class": "logging.handlers.RotatingFileHandler",
-                "filename": "logs/game.log",
-                "backupCount": 100,
-                "formatter": "plain",
-            },
-        },
-        "loggers": {
-            "": {
-                "handlers": ["default", "file"],
-                "level": "DEBUG",
-                "propagate": True,
-            },
-        },
-    }
-)
+try:
+    os.mkdir(config["server"]["log_dir"])
+except FileExistsError:
+    pass
+
+logging.config.dictConfig(config_dict)
+
+
 structlog.configure(
     processors=[
         structlog.stdlib.add_log_level,
@@ -233,7 +237,7 @@ app = FastAPI(
         "email": "Ralf.Kelzenberg@vodafone.com",
     },
 )
-app.mount("/logs", StaticFiles(directory=LOG_DIR), name="logs")
+app.mount("/logs", StaticFiles(directory=config["server"]["log_dir"]), name="logs")
 
 command_queue: asyncio.Queue[game.Order | object] = asyncio.Queue()
 
@@ -293,18 +297,19 @@ class ActorProperty(BaseModel):
 
 class RulesResponse(BaseModel):
     map_size: int = Field(
-        default=game.MAP_SIZE, description="The length of the game board in x and y."
+        default=config["game"]["map_size"],
+        description="The length of the game board in x and y.",
     )
     max_ticks: int = Field(
-        default=game.MAX_TICKS,
-        description="TThe maximum number of ticks the game will last.",
+        default=config["game"]["max_ticks"],
+        description="The maximum number of ticks the game will last.",
     )
     max_score: int = Field(
-        default=game.MAX_SCORE,
+        default=config["game"]["max_score"],
         description="The maximum score that will force the game to end.",
     )
     home_Flag_not_required: bool = Field(
-        default=game.HOME_FLAG_REQUIRED,
+        default=config["game"]["home_flag_required"],
         description="Is the flag required to be at home to score? ",
     )
     actor_types: list[ActorProperty]
@@ -383,7 +388,7 @@ async def get_game_start() -> int:
 @app.get("/log_files", tags=["states"])
 async def get_log_files() -> list[str]:
     """Get all log files accessible through /logs/[filename]"""
-    return os.listdir(LOG_DIR)
+    return os.listdir(config["server"]["log_dir"])
 
 
 teams = [
@@ -405,32 +410,8 @@ async def single_game():
     for handler in root_logger.handlers:
         if isinstance(handler, logging.handlers.RotatingFileHandler):
             handler.doRollover()
-    my_game = game.Game(
-        teams=teams,
-        pregame_wait=PREGAME_WAIT,
-        board=game.Board(walls=0),
-        actors=game.InitialActorsList(actors=[game.Generalist]),
-    )
+    my_game = game.Game(board=game.Board(walls=0))
 
-    # my_game = Game(teams=teams, pregame_wait = PREGAME_WAIT,
-    #     board=Board(walls=0),
-    #     actors=InitialActorsList(actors=[game.Generalist, game.Generalist, game.Generalist]),
-    # )
-
-    # my_game = Game(teams=teams, pregame_wait = PREGAME_WAIT,
-    #     board=Board(walls=0),
-    #     actors=InitialActorsList(actors=[game.Runner, game.Attacker, game.Attacker]),
-    # )
-
-    # my_game = Game(teams=teams, pregame_wait = PREGAME_WAIT,
-    #     board=Board(walls=10),
-    #     actors=InitialActorsList(actors=[game.Runner, game.Attacker, game.Attacker]),
-    # )
-
-    # my_game = Game(teams=teams, pregame_wait = PREGAME_WAIT,
-    #     board=Board(walls=10),
-    #     actors=InitialActorsList(actors=[game.Runner, game.Attacker, game.Attacker, game.Blocker, game.Blocker]),
-    # )
     logger.info("Initiating game.")
     my_game.initiate_game()
 
@@ -455,23 +436,25 @@ async def single_game():
 
         logger.info("Waiting for game commands.")
         my_game.time_of_next_execution = datetime.datetime.now() + datetime.timedelta(
-            0, WAIT_TIME
+            0, config["server"]["tick_wait_time"]
         )
         next_execution = my_game.time_of_next_execution
         logger.info(f"Time of next execution: {next_execution}")
 
-        await asyncio.sleep(WAIT_TIME)
+        await asyncio.sleep(config["server"]["tick_wait_time"])
     my_game.end_game()
     os.system("cls" if os.name == "nt" else "clear")
     print(my_game.scoreboard())
     print(my_game.board.image())
 
 
-async def get_all_queue_items(queue: asyncio.Queue[game.Order | object]):
+async def get_all_queue_items(
+    queue: asyncio.Queue[game.Order | object],
+) -> list[game.Order]:
     items: list[game.Order] = []
     item = await queue.get()
     while item is not SENTINEL:
-        items.append(item)  # typing ignore
+        items.append(item)  # type: ignore
         queue.task_done()
         item = await queue.get()
     queue.task_done()
