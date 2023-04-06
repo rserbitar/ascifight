@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-import logging
+import logging, logging.config, logging.handlers
 import structlog
 from structlog.contextvars import bind_contextvars
 
@@ -235,7 +235,7 @@ app = FastAPI(
 )
 app.mount("/logs", StaticFiles(directory=LOG_DIR), name="logs")
 
-command_queue = asyncio.Queue()
+command_queue: asyncio.Queue[game.Order | object] = asyncio.Queue()
 
 
 class ActorDescriptions(BaseModel):
@@ -403,7 +403,7 @@ async def routine():
 async def single_game():
     global my_game
     for handler in root_logger.handlers:
-        if handler.__class__.__name__ == "RotatingFileHandler":
+        if isinstance(handler, logging.handlers.RotatingFileHandler):
             handler.doRollover()
     my_game = game.Game(
         teams=teams,
@@ -467,11 +467,11 @@ async def single_game():
     print(my_game.board.image())
 
 
-async def get_all_queue_items(queue):
-    items = []
+async def get_all_queue_items(queue: asyncio.Queue[game.Order | object]):
+    items: list[game.Order] = []
     item = await queue.get()
     while item is not SENTINEL:
-        items.append(item)
+        items.append(item)  # typing ignore
         queue.task_done()
         item = await queue.get()
     queue.task_done()
@@ -483,11 +483,15 @@ async def ai_generator():
     while True:
         await asyncio.sleep(5)
         await command_queue.put(
-            game.MoveOrder(team="S", password="1", actor=0, direction="down")
+            game.MoveOrder(
+                team="S", password="1", actor=0, direction=game.Directions.down
+            )
         )
         await asyncio.sleep(5)
         await command_queue.put(
-            game.MoveOrder(team="S", password="1", actor=0, direction="right")
+            game.MoveOrder(
+                team="S", password="1", actor=0, direction=game.Directions.right
+            )
         )
 
 

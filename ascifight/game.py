@@ -597,6 +597,7 @@ class Game:
         grab_successful = random.random() < actor.grab
         target_actor = self.board.coordinates_actors.get(target_coordinates)
         already_grabbed = False
+        flag: int | None
 
         if actor.flag is not None:
             flag = actor.flag
