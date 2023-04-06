@@ -230,6 +230,9 @@ class ActorDescriptions(BaseModel):
     team: str = Field(description="The name of the actor's team.")
     type: str = Field(description="The type of the actor determining its capabilities.")
     ident: int = Field(description="The identity number specific to the team.")
+    flag: int | None = Field(
+        description="If and which teams flag the actor is carrying."
+    )
     coordinates: game.Coordinates
 
 
@@ -351,6 +354,7 @@ async def get_game_state() -> StateResponse:
                 team=actor.team.name,
                 type=actor.type,
                 ident=actor.ident,
+                flag=actor.flag,
                 coordinates=coordinates,
             )
             for actor, coordinates in my_game.board.actors_coordinates.items()
