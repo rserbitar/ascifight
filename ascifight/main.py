@@ -11,6 +11,7 @@ from structlog.contextvars import bind_contextvars
 import toml
 
 import game
+import board
 
 with open("config.toml", mode="r") as fp:
     config = toml.load(fp)
@@ -233,7 +234,7 @@ class ActorDescription(BaseModel):
     flag: str | None = Field(
         description="If and which teams flag the actor is carrying."
     )
-    coordinates: game.Coordinates
+    coordinates: board.Coordinates
 
 
 class StateResponse(BaseModel):
@@ -243,13 +244,13 @@ class StateResponse(BaseModel):
     actors: list[ActorDescription] = Field(
         description="A list of all actors in the game."
     )
-    flags: list[game.Coordinates] = Field(
+    flags: list[board.Coordinates] = Field(
         description="A list of all flags in the game. The flags are ordered according to the teams they belong to."
     )
-    bases: list[game.Coordinates] = Field(
+    bases: list[board.Coordinates] = Field(
         description="A list of all bases in the game. The bases are ordered according to the teams they belong to."
     )
-    walls: list[game.Coordinates] = Field(
+    walls: list[board.Coordinates] = Field(
         description="A list of all walls in the game. Actors can not enter wall fields."
     )
     scores: list[int] = Field(
@@ -288,7 +289,7 @@ class RulesResponse(BaseModel):
         default=config["game"]["home_flag_required"],
         description="Is the flag required to be at home to score?",
     )
-    actor_properties: list[game.ActorProperty]
+    actor_properties: list[board.ActorProperty]
 
 
 app = FastAPI(
@@ -401,7 +402,7 @@ async def single_game() -> None:
     for handler in root_logger.handlers:
         if isinstance(handler, logging.handlers.RotatingFileHandler):
             handler.doRollover()
-    my_game = game.Game(board=game.Board(walls=0))
+    my_game = game.Game(game_board=board.Board(walls=0))
 
     logger.info("Initiating game.")
     my_game.initiate_game()
@@ -457,13 +458,13 @@ async def ai_generator():
         await asyncio.sleep(5)
         await command_queue.put(
             game.MoveOrder(
-                team="Team 1", password="1", actor=0, direction=game.Directions.down
+                team="Team 1", password="1", actor=0, direction=board.Directions.down
             )
         )
         await asyncio.sleep(5)
         await command_queue.put(
             game.MoveOrder(
-                team="Team 2", password="2", actor=0, direction=game.Directions.right
+                team="Team 2", password="2", actor=0, direction=board.Directions.right
             )
         )
 
