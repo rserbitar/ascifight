@@ -226,11 +226,11 @@ tags_metadata = [
 ]
 
 
-class ActorDescriptions(BaseModel):
+class ActorDescription(BaseModel):
     team: str = Field(description="The name of the actor's team.")
     type: str = Field(description="The type of the actor determining its capabilities.")
     ident: int = Field(description="The identity number specific to the team.")
-    flag: int | None = Field(
+    flag: str | None = Field(
         description="If and which teams flag the actor is carrying."
     )
     coordinates: game.Coordinates
@@ -240,7 +240,7 @@ class StateResponse(BaseModel):
     teams: list[str] = Field(
         description="A list of all teams in the game. This is also the order of flags and bases."
     )
-    actors: list[ActorDescriptions] = Field(
+    actors: list[ActorDescription] = Field(
         description="A list of all actors in the game."
     )
     flags: list[game.Coordinates] = Field(
@@ -271,17 +271,6 @@ class TimingResponse(BaseModel):
     )
 
 
-class ActorProperty(BaseModel):
-    type: str
-    grab: float = Field(
-        description="The probability to successfully grab or put the flag. "
-        "An actor with 0 can not carry the flag. Not even when it is given to it.",
-    )
-    attack: float = Field(
-        description="The probability to successfully attack. An actor with 0 can not attack.",
-    )
-
-
 class RulesResponse(BaseModel):
     map_size: int = Field(
         default=config["game"]["map_size"],
@@ -297,9 +286,9 @@ class RulesResponse(BaseModel):
     )
     home_Flag_not_required: bool = Field(
         default=config["game"]["home_flag_required"],
-        description="Is the flag required to be at home to score? ",
+        description="Is the flag required to be at home to score?",
     )
-    actor_types: list[ActorProperty]
+    actor_properties: list[game.ActorProperty]
 
 
 app = FastAPI(
@@ -324,21 +313,21 @@ command_queue: asyncio.Queue[game.Order | object] = asyncio.Queue()
 
 
 @app.post("/move_order", tags=["orders"])
-async def move_order(order: game.MoveOrder):
+async def move_order(order: game.MoveOrder) -> dict[str, str]:
     """Move an actor into a direction. Moving over your own flag return it to the base."""
     command_queue.put_nowait(order)
     return {"message": "Move order added."}
 
 
 @app.post("/attack_order", tags=["orders"])
-async def attack_order(order: game.AttackOrder):
+async def attack_order(order: game.AttackOrder) -> dict[str, str]:
     """Only actors with the attack property can attack."""
     command_queue.put_nowait(order)
     return {"message": "Attack order added."}
 
 
 @app.post("/grabput_order", tags=["orders"])
-async def grabput_order(order: game.GrabPutOrder):
+async def grabput_order(order: game.GrabPutOrder) -> dict[str, str]:
     """If the actor has a flag it puts it, even to another actor that can carry it. If it doesn't have a flag, it grabs it, even from another actor."""
     command_queue.put_nowait(order)
     return {"message": "Grabput order added."}
@@ -350,11 +339,11 @@ async def get_game_state() -> StateResponse:
     return StateResponse(
         teams=my_game.teams,
         actors=[
-            ActorDescriptions(
+            ActorDescription(
                 team=actor.team.name,
-                type=actor.type,
+                type=actor.__class__.__name__,
                 ident=actor.ident,
-                flag=actor.flag,
+                flag=actor.flag.team.name if actor.flag else None,
                 coordinates=coordinates,
             )
             for actor, coordinates in my_game.board.actors_coordinates.items()
@@ -371,11 +360,8 @@ async def get_game_state() -> StateResponse:
 @app.get("/game_rules", tags=["states"])
 async def get_game_rules() -> RulesResponse:
     """Get the current rules and actor properties."""
-    actor_types = [
-        ActorProperty(type=actor.type, grab=actor.grab, attack=actor.attack)
-        for actor in my_game.actors_of_team[my_game.teams[0]]
-    ]
-    return RulesResponse(actor_types=actor_types)
+    actor_properties = my_game.get_actor_properties()
+    return RulesResponse(actor_properties=actor_properties)
 
 
 @app.get("/timing", tags=["states"])
@@ -471,13 +457,13 @@ async def ai_generator():
         await asyncio.sleep(5)
         await command_queue.put(
             game.MoveOrder(
-                team="S", password="1", actor=0, direction=game.Directions.down
+                team="Team 1", password="1", actor=0, direction=game.Directions.down
             )
         )
         await asyncio.sleep(5)
         await command_queue.put(
             game.MoveOrder(
-                team="S", password="1", actor=0, direction=game.Directions.right
+                team="Team 2", password="2", actor=0, direction=game.Directions.right
             )
         )
 
@@ -485,4 +471,4 @@ async def ai_generator():
 @app.on_event("startup")
 async def startup():
     asyncio.create_task(routine())
-    # asyncio.create_task(ai_generator())
+    asyncio.create_task(ai_generator())

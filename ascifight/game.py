@@ -135,47 +135,95 @@ class Team(BaseModel):
         return f"Team {self.name}"
 
 
-class Actor(BaseModel, abc.ABC):
-    type = "Base"
+class ActorProperty(BaseModel):
+    type: str
+    grab: float = Field(
+        description="The probability to successfully grab or put the flag. "
+        "An actor with 0 can not carry the flag. Not even when it is given to it.",
+    )
+    attack: float = Field(
+        description="The probability to successfully attack. An actor with 0 can not attack.",
+    )
+
+
+class BoardObject(BaseModel, abc.ABC):
+    pass
+
+
+class Flag(BoardObject):
+    team: Team
+
+    def __eq__(self, another):
+        return (
+            self.__class__.__name__ == another.__class__.__name__
+            and hasattr(another, "team")
+            and self.team.name == another.team.name
+        )
+
+    def __hash__(self):
+        return hash((self.__class__.__name__, self.team.name))
+
+
+class Actor(BoardObject, abc.ABC):
     ident: int
     team: Team
     grab = 0.0
     attack = 0.0
-    flag: int | None = None
+    flag: Flag | None = None
 
     def __str__(self):
-        return f"Actor ({self.type}) {self.team.name}-{self.ident}"
+        return f"Actor ({self.__class__.__name__}) {self.team}-{self.ident}"
 
     def __eq__(self, another):
         return (
-            hasattr(another, "ident")
+            self.__class__.__name__ == another.__class__.__name__
+            and hasattr(another, "ident")
             and self.ident == another.ident
             and hasattr(another, "team")
             and self.team == another.team
         )
 
     def __hash__(self):
-        return hash((self.ident, self.team))
+        return hash((self.__class__.__name__, self.ident, self.team))
+
+    @classmethod
+    def get_properties(cls) -> ActorProperty:
+        return ActorProperty(type=cls.__name__, grab=cls.grab, attack=cls.attack)
 
 
 class Generalist(Actor):
-    type = "Generalist"
     grab = 1.0
     attack = 1.0
 
 
 class Runner(Actor):
-    type = "Runner"
     grab = 1.0
 
 
 class Attacker(Actor):
-    type = "Attacker"
     attack = 1.0
 
 
 class Blocker(Actor):
-    type = "Blocker"
+    pass
+
+
+class Base(BoardObject):
+    team: Team
+
+    def __eq__(self, another):
+        return (
+            self.__class__.__name__ == another.__class__.__name__
+            and hasattr(another, "team")
+            and self.team.name == another.team.name
+        )
+
+    def __hash__(self):
+        return hash((self.__class__.__name__, self.team.name))
+
+
+class Wall(BoardObject):
+    pass
 
 
 class Board:
@@ -186,8 +234,8 @@ class Board:
 
         self.logger = structlog.get_logger()
         self.actors_coordinates: dict[Actor, Coordinates] = {}
-        self.flags_coordinates: dict[int, Coordinates] = {}
-        self.bases_coordinates: dict[int, Coordinates] = {}
+        self.flags_coordinates: dict[Flag, Coordinates] = {}
+        self.bases_coordinates: dict[Base, Coordinates] = {}
         self.walls_coordinates: set[Coordinates] = set()
 
     @property
@@ -207,15 +255,24 @@ class Board:
         return {v: k for k, v in self.actors_coordinates.items()}
 
     @property
-    def coordinates_flags(self) -> dict[Coordinates, int]:
+    def coordinates_flags(self) -> dict[Coordinates, Flag]:
+        # TODO: multiple flags can be in a position! this code does not notice that
         return {v: k for k, v in self.flags_coordinates.items()}
 
     @property
-    def coordinates_bases(self) -> dict[Coordinates, int]:
+    def coordinates_bases(self) -> dict[Coordinates, Base]:
         return {v: k for k, v in self.bases_coordinates.items()}
 
+    def get_all_objects(self, coordinates) -> list[BoardObject]:
+        base = self.coordinates_bases.get(coordinates)
+        actor = self.coordinates_actors.get(coordinates)
+        flags = self.coordinates_flags.get(coordinates)
+        wall = Wall() if coordinates in self.walls_coordinates else None
+        objects = [base, actor, flags, wall]
+        return [i for i in objects if i is not None]
+
     def respawn(self, actor: Actor) -> None:
-        base_coordinates = self.flags_coordinates[actor.team.number]
+        base_coordinates = self.bases_coordinates[Base(team=actor.team)]
         possible_spawn_points = []
         for x in range(base_coordinates.x - 2, base_coordinates.x + 3):
             for y in range(base_coordinates.y - 2, base_coordinates.y + 3):
@@ -231,21 +288,41 @@ class Board:
         forbidden_positions = set(
             flag_positions + actor_positions + base_positions + walls_positions
         )
-        self.place_actor_in_area(actor, possible_spawn_points, forbidden_positions)
+        self._place_actor_in_area(actor, possible_spawn_points, forbidden_positions)
 
-    def place_actor_in_area(
-        self,
-        actor: Actor,
-        possible_spawn_points: list[Coordinates],
-        forbidden_positions: set[Coordinates],
-    ) -> None:
-        allowed_positions = set(possible_spawn_points) - set(forbidden_positions)
-        target_coordinates = random.choice(list(allowed_positions))
-        if actor.flag is not None:
-            self.logger.info(f"{actor} dropped flag {actor.flag}.")
-            actor.flag = None
-        self.actors_coordinates[actor] = target_coordinates
-        self.logger.info(f"{actor} respawned to coordinates {target_coordinates}.")
+    def return_flag_to_base(self, flag: Flag) -> None:
+        self.flags_coordinates[flag] = self.bases_coordinates[Base(team=flag.team)]
+
+    def place_bases_and_flags(self, teams: list[Team]) -> None:
+        available_places = list(range(len(self.base_place_matrix)))
+        for team in teams:
+            place_chosen = random.choice(available_places)
+            available_places.remove(place_chosen)
+            x = random.randint(*self.base_place_matrix[place_chosen][0])
+            y = random.randint(*self.base_place_matrix[place_chosen][1])
+            coordinates = Coordinates(x=x, y=y)
+            self.bases_coordinates[Base(team=team)] = coordinates
+            self.flags_coordinates[Flag(team=team)] = coordinates
+
+    def place_actors(self, actors: list[Actor], base: Coordinates) -> None:
+        starting_places = self._get_area_positions(base, 2)
+        starting_places.remove(base)
+        random.shuffle(starting_places)
+        starting_places = starting_places[: len(actors)]
+        for actor, coordinates in zip(actors, starting_places):
+            self.actors_coordinates[actor] = coordinates
+
+    def place_walls(self) -> None:
+        forbidden_positions = set()
+        for base_coordinates in self.bases_coordinates.values():
+            forbidden_positions.update(self._get_area_positions(base_coordinates, 3))
+        all_combinations = itertools.product(
+            *[range(self.map_size), range(self.map_size)]
+        )
+        all_positions = {Coordinates(x=i[0], y=i[1]) for i in all_combinations}
+        possible_coordinates = list(all_positions - forbidden_positions)
+        random.shuffle(possible_coordinates)
+        self.walls_coordinates = set(possible_coordinates[: self.walls])
 
     def calc_target_coordinates(
         self, actor: Actor, direction: Directions
@@ -264,9 +341,63 @@ class Board:
 
     def move(self, actor: Actor, direction: Directions) -> bool:
         new_coordinates = self.calc_target_coordinates(actor, direction)
-        return self.try_put_actor(actor, new_coordinates)
+        return self._try_put_actor(actor, new_coordinates)
 
-    def try_put_actor(self, actor: Actor, new_coordinates: Coordinates) -> bool:
+    def image(self) -> str:
+        field = [["___" for _ in range(self.map_size)] for _ in range(self.map_size)]
+
+        for i, base in enumerate(self.bases_coordinates.values()):
+            field[base.y][base.x] = f" {colors[i]}\u25D9{colors['revert']} "
+        for actor, coordinates in self.actors_coordinates.items():
+            char = actor.__class__.__name__[0].upper()
+            number = actor.ident
+            color = colors[actor.team.number]
+            field[coordinates.y][
+                coordinates.x
+            ] = f"{color}{char}{number}{colors['revert']} "
+        for flag, coordinates in self.flags_coordinates.items():
+            color = colors[flag.team.number]
+            before = field[coordinates.y][coordinates.x]
+            field[coordinates.y][coordinates.x] = (
+                before[:-2] + f" {color}\u25B2{colors['revert']}"
+            )
+        for wall_coordinate in self.walls_coordinates:
+            field[wall_coordinate.y][wall_coordinate.x] = "\u2588\u2588\u2588"
+        for row in field:
+            row.append("\n")
+        # reverse so (0,0) is lower left not upper left
+        field.reverse()
+        joined = "".join(list(itertools.chain.from_iterable(field)))
+        return joined
+
+    def _place_actor_in_area(
+        self,
+        actor: Actor,
+        possible_spawn_points: list[Coordinates],
+        forbidden_positions: set[Coordinates],
+    ) -> None:
+        allowed_positions = set(possible_spawn_points) - set(forbidden_positions)
+        target_coordinates = random.choice(list(allowed_positions))
+        if actor.flag is not None:
+            self.logger.info(f"{actor} dropped flag {actor.flag}.")
+            actor.flag = None
+        self.actors_coordinates[actor] = target_coordinates
+        self.logger.info(f"{actor} respawned to coordinates {target_coordinates}.")
+
+    def _get_area_positions(
+        self, center: Coordinates, distance: int
+    ) -> list[Coordinates]:
+        positions: list[Coordinates] = []
+        for x in range(center.x - distance, center.x + distance):
+            for y in range(center.y - distance, center.y + distance):
+                try:
+                    positions.append(Coordinates(x=x, y=y))
+                    # ignore forbidden space out of bounds
+                except ValidationError:
+                    pass
+        return positions
+
+    def _try_put_actor(self, actor: Actor, new_coordinates: Coordinates) -> bool:
         coordinates = self.actors_coordinates[actor]
         moved = False
 
@@ -290,81 +421,6 @@ class Board:
 
         return moved
 
-    def image(self) -> str:
-        field = [["___" for _ in range(self.map_size)] for _ in range(self.map_size)]
-
-        for i, base in enumerate(self.bases_coordinates.values()):
-            field[base.y][base.x] = f" {colors[i]}\u25D9{colors['revert']} "
-        for actor, coordinates in self.actors_coordinates.items():
-            char = actor.type[0].upper()
-            number = actor.ident
-            color = colors[actor.team.number]
-            field[coordinates.y][
-                coordinates.x
-            ] = f"{color}{char}{number}{colors['revert']} "
-        for flag, coordinates in self.flags_coordinates.items():
-            color = colors[flag]
-            before = field[coordinates.y][coordinates.x]
-            field[coordinates.y][coordinates.x] = (
-                before[:-2] + f" {color}\u25B2{colors['revert']}"
-            )
-        for wall_coordinate in self.walls_coordinates:
-            field[wall_coordinate.y][wall_coordinate.x] = "\u2588\u2588\u2588"
-        for row in field:
-            row.append("\n")
-        # reverse so (0,0) is lower left not upper left
-        field.reverse()
-        joined = "".join(list(itertools.chain.from_iterable(field)))
-        return joined
-
-    def place_bases(self, teams: int) -> None:
-        available_places = list(range(len(self.base_place_matrix)))
-        for i in range(teams):
-            place_chosen = random.choice(available_places)
-            available_places.remove(place_chosen)
-            x = random.randint(*self.base_place_matrix[place_chosen][0])
-            y = random.randint(*self.base_place_matrix[place_chosen][1])
-            coordinates = Coordinates(x=x, y=y)
-            self.bases_coordinates[i] = coordinates
-            self.flags_coordinates[i] = coordinates
-
-    def reserve_space(self, taken, coordinates):
-        for x in range(coordinates.x - 2, coordinates.x + 3):
-            for y in range(coordinates.y - 2, coordinates.y + 3):
-                taken.append(Coordinates(x=x, y=y))
-        return taken
-
-    def place_actors(self, actors: list[Actor], base: Coordinates) -> None:
-        starting_places = []
-        for x in range(base.x - 1, base.x + 2):
-            for y in range(base.y - 1, base.y + 2):
-                starting_places.append(Coordinates(x=x, y=y))
-        starting_places.remove(base)
-        starting_places = starting_places[: len(actors)]
-        random.shuffle(starting_places)
-        for actor, coordinates in zip(actors, starting_places):
-            self.actors_coordinates[actor] = coordinates
-
-    def place_walls(self) -> None:
-        forbidden_positions = set()
-        for base_coordinates in self.bases_coordinates.values():
-            for x in range(base_coordinates.x - 2, base_coordinates.x + 3):
-                for y in range(base_coordinates.y - 2, base_coordinates.y + 3):
-                    try:
-                        forbidden_positions.add(Coordinates(x=x, y=y))
-                    # ignore forbidden space out of bounds
-                    except ValidationError:
-                        pass
-        walls = 0
-        while walls < self.walls:
-            coordinates = Coordinates(
-                x=random.randint(0, self.map_size - 1),
-                y=random.randint(0, self.map_size - 1),
-            )
-            if coordinates not in forbidden_positions:
-                self.walls_coordinates.add(coordinates)
-                walls += 1
-
 
 class Game:
     def __init__(
@@ -380,7 +436,7 @@ class Game:
         self.logger = structlog.get_logger()
         self.score_file = score_file
         self.score_multiplier = score_multiplier
-        self.actors: list[type[Actor]] = [self.get_actor(actor) for actor in actors]
+        self.actors: list[type[Actor]] = [self._get_actor(actor) for actor in actors]
         self.board = board
         self.teams: list[str] = [team["name"] for team in teams]
         self.names_teams: dict[str, Team] = {
@@ -388,8 +444,8 @@ class Game:
             for i, team in enumerate(teams)
         }
         self.teams_actors: dict[tuple[Team, int], Actor] = {}
-        self.scores: dict[int, int] = {}
-        self.overall_score: dict[int, int] = {}
+        self.scores: dict[Team, int] = {}
+        self.overall_score: dict[Team, int] = {}
         self.tick = 0
         self.max_ticks = max_ticks
         self.max_score = max_score
@@ -408,21 +464,63 @@ class Game:
         self._set_scores()
         self._read_scores()
         self._create_team_actors()
-        self._place_actors_and_bases()
+        self._place_board_objects()
 
     def end_game(self):
-        self.write_scores()
+        self._write_scores()
 
-    def get_actor(self, actor: str) -> type[Actor]:
+    def execute_game_step(self, orders: list[Order]) -> None:
+        self.tick += 1
+
+        move_orders: list[MoveOrder] = []
+        attack_orders: list[AttackOrder] = []
+        grabput_orders: list[GrabPutOrder] = []
+
+        for order in orders:
+            if self._validate_order(order):
+                if isinstance(order, MoveOrder):
+                    move_orders.append(order)
+                elif isinstance(order, AttackOrder):
+                    attack_orders.append(order)
+                elif isinstance(order, GrabPutOrder):
+                    grabput_orders.append(order)
+
+        self.logger.info("Executing move orders.")
+        self._execute_move_orders(move_orders)
+
+        self.logger.info("Executing grab/put orders.")
+        self._execute_grabput_orders(grabput_orders)
+
+        self.logger.info("Executing attack orders.")
+        self._execute_attack_orders(attack_orders)
+
+    def scoreboard(self) -> str:
+        current_score = " - ".join(
+            [
+                f"{colors[team.number]}{team.name}: {score}{colors['revert']}"
+                for team, score in self.scores.items()
+            ]
+        )
+        overall_score = " - ".join(
+            [
+                f"{colors[team.number]}{team.name}: {score}{colors['revert']}"
+                for team, score in self.overall_score.items()
+            ]
+        )
+        return f"{colors['bold']}Overall Score{colors['revert']}: {overall_score} \n{colors['bold']}Current Score{colors['revert']}: {current_score}"
+
+    def get_actor_properties(self) -> list[ActorProperty]:
+        return [actor.get_properties() for actor in self.actors]
+
+    def _get_actor(self, actor: str) -> type[Actor]:
         return getattr(sys.modules[__name__], actor)
 
     def _set_scores(self) -> None:
-        for i in range(len(self.names_teams)):
-            self.scores[i] = 0
-        for i in range(len(self.names_teams)):
-            self.overall_score[i] = 0
+        for team in self.names_teams.values():
+            self.scores[team] = 0
+            self.overall_score[team] = 0
 
-    def write_scores(self):
+    def _write_scores(self):
         game_scores = []
         scores = list(self.scores.items())
         scores = sorted(scores, key=lambda x: x[1], reverse=True)
@@ -434,7 +532,7 @@ class Game:
 
         with open(self.score_file, "a") as score_file:
             for score in game_scores:
-                score_file.write(f"{self.teams[score[0]]}: {score[1]}\n")
+                score_file.write(f"{score[0].name}: {score[1]}\n")
 
     def _read_scores(self):
         try:
@@ -444,7 +542,7 @@ class Game:
                     score = int(score)
                     team = team.strip()
                     try:
-                        self.overall_score[self.teams.index(team)] += score
+                        self.overall_score[self.names_teams[team]] += score
                     # ignore score if team is not in current teams
                     except ValueError:
                         pass
@@ -452,29 +550,12 @@ class Game:
         except FileNotFoundError:
             pass
 
-    def scoreboard(self) -> str:
-        current_score = " - ".join(
-            [
-                f"{colors[i]}{self.teams[i]}: {score}{colors['revert']}"
-                for i, score in self.scores.items()
-            ]
-        )
-        overall_score = " - ".join(
-            [
-                f"{colors[i]}{self.teams[i]}: {score}{colors['revert']}"
-                for i, score in self.overall_score.items()
-            ]
-        )
-        return f"{colors['bold']}Overall Score{colors['revert']}: {overall_score} \n{colors['bold']}Current Score{colors['revert']}: {current_score}"
-
-    def _place_actors_and_bases(self) -> None:
-        self.board.place_bases(len(self.names_teams))
-        for p, team in enumerate(self.names_teams.values()):
-            coordinates = self.board.bases_coordinates[p]
-            actors = []
-            for a in range(len(self.actors)):
-                actors.append(self.teams_actors[(team, a)])
-                self.board.place_actors(actors, coordinates)
+    def _place_board_objects(self) -> None:
+        self.board.place_bases_and_flags(list(self.names_teams.values()))
+        for team in self.names_teams.values():
+            coordinates = self.board.bases_coordinates[Base(team=team)]
+            actors = [self.teams_actors[(team, a)] for a in range(len(self.actors))]
+            self.board.place_actors(actors, coordinates)
         self.board.place_walls()
 
     def _create_team_actors(self) -> None:
@@ -482,13 +563,13 @@ class Game:
             for number, actor in enumerate(self.actors):
                 self.teams_actors[(team, number)] = actor(ident=number, team=team)
 
-    def actor_dict(self, value: T) -> dict[Actor, T]:
+    def _actor_dict(self, value: T) -> dict[Actor, T]:
         value_dict = {}
         for actor in self.teams_actors.values():
             value_dict[actor] = value
         return value_dict
 
-    def validate_order(self, order: Order) -> bool:
+    def _validate_order(self, order: Order) -> bool:
         check = False
         if order.team in self.names_teams.keys():
             check = self.names_teams[order.team].password == order.password
@@ -498,33 +579,8 @@ class Game:
             self.logger.warning(f"{order} was ignored. Team unknown.")
         return check
 
-    def execute_game_step(self, orders: list[Order]) -> None:
-        self.tick += 1
-
-        move_orders: list[MoveOrder] = []
-        attack_orders: list[AttackOrder] = []
-        grabput_orders: list[GrabPutOrder] = []
-
-        for order in orders:
-            if self.validate_order(order):
-                if isinstance(order, MoveOrder):
-                    move_orders.append(order)
-                elif isinstance(order, AttackOrder):
-                    attack_orders.append(order)
-                elif isinstance(order, GrabPutOrder):
-                    grabput_orders.append(order)
-
-        self.logger.info("Executing move orders.")
-        self.execute_move_orders(move_orders)
-
-        self.logger.info("Executing grab/put orders.")
-        self.execute_grabput_orders(grabput_orders)
-
-        self.logger.info("Executing attack orders.")
-        self.execute_attack_orders(attack_orders)
-
-    def execute_move_orders(self, move_orders: list[MoveOrder]) -> None:
-        already_moved = self.actor_dict(False)
+    def _execute_move_orders(self, move_orders: list[MoveOrder]) -> None:
+        already_moved = self._actor_dict(False)
         for order in move_orders:
             bind_contextvars(team=order.team)
             self.logger.info(f"Executing {order}")
@@ -536,12 +592,12 @@ class Game:
                 # if the actor can move
                 already_moved[actor] = self.board.move(actor, direction)
                 if already_moved[actor]:
-                    self.check_flag_return_conditions(actor)
+                    self._check_flag_return_conditions(actor)
 
         unbind_contextvars("team")
 
-    def execute_attack_orders(self, attack_orders: list[AttackOrder]) -> None:
-        already_attacked = self.actor_dict(False)
+    def _execute_attack_orders(self, attack_orders: list[AttackOrder]) -> None:
+        already_attacked = self._actor_dict(False)
         for order in attack_orders:
             bind_contextvars(team=order.team)
             self.logger.info(f"Executing {order}")
@@ -573,8 +629,8 @@ class Game:
 
         unbind_contextvars("team")
 
-    def execute_grabput_orders(self, grabput_orders: list[GrabPutOrder]):
-        already_grabbed = self.actor_dict(False)
+    def _execute_grabput_orders(self, grabput_orders: list[GrabPutOrder]):
+        already_grabbed = self._actor_dict(False)
         for order in grabput_orders:
             bind_contextvars(team=order.team)
             self.logger.info(f"Executing {order}")
@@ -584,16 +640,16 @@ class Game:
                     actor, order.direction
                 )
 
-                already_grabbed[actor] = self.grabput_flag(actor, target_coordinates)
+                already_grabbed[actor] = self._grabput_flag(actor, target_coordinates)
             else:
                 self.logger.warning(f"{actor} already grabbed this tick.")
         unbind_contextvars("team")
 
-    def grabput_flag(self, actor: Actor, target_coordinates: Coordinates) -> bool:
+    def _grabput_flag(self, actor: Actor, target_coordinates: Coordinates) -> bool:
         grab_successful = random.random() < actor.grab
         target_actor = self.board.coordinates_actors.get(target_coordinates)
         already_grabbed = False
-        flag: int | None
+        flag: Flag | None
 
         if actor.flag is not None:
             flag = actor.flag
@@ -615,7 +671,7 @@ class Game:
                     target_actor.flag = flag
                     already_grabbed = True
                     self.logger.info(f"{actor} handed the flag to {target_actor}.")
-                    self.check_flag_return_conditions(target_actor)
+                    self._check_flag_return_conditions(target_actor)
 
             # no target actor, means empty field, wall or base (even a flag???)
             else:
@@ -630,7 +686,7 @@ class Game:
                     self.logger.info(
                         f"{actor} put the flag to coordinates {target_coordinates}."
                     )
-                    self.check_score_conditions(flag)
+                    self._check_score_conditions(flag)
 
         # the actor does not have the flag
         else:
@@ -649,13 +705,11 @@ class Game:
                     if target_actor is not None:
                         target_actor.flag = None
                         self.logger.info(
-                            f"{actor} grabbed the flag of {self.teams[flag]} from {target_actor}."
+                            f"{actor} grabbed the flag of {flag.team} from {target_actor}."
                         )
                     else:
-                        self.logger.info(
-                            f"{actor} grabbed the flag of {self.teams[flag]}."
-                        )
-                    self.check_flag_return_conditions(actor=actor)
+                        self.logger.info(f"{actor} grabbed the flag of {flag.team}.")
+                    self._check_flag_return_conditions(actor=actor)
                 else:
                     self.logger.info(f"{actor} grabbed and missed the flag.")
 
@@ -666,41 +720,46 @@ class Game:
             self.tick == self.max_ticks or max(self.scores.values()) == self.max_score
         )
 
-    def check_score_conditions(self, flag: int | None = None) -> None:
+    def _check_score_conditions(self, flag_to_score: Flag | None = None) -> None:
         flags = (
-            [flag] if flag else [flag for flag in self.board.flags_coordinates.keys()]
+            [flag_to_score]
+            if flag_to_score
+            else [flag for flag in self.board.flags_coordinates.keys()]
         )
-        for flag in flags:
-            coordinates = self.board.flags_coordinates[flag]
-            base = self.board.coordinates_bases.get(coordinates)
+        for flag_to_score in flags:
+            score_flag_coordinates = self.board.flags_coordinates[flag_to_score]
+            base_at_flag_coordinates = self.board.coordinates_bases.get(
+                score_flag_coordinates
+            )
             # if the flag is an enemy flag and owner flag is also there
             if (
                 # flag is on a base
-                base is not None
+                base_at_flag_coordinates is not None
                 # flag is not on it own base
-                and (flag != base)
+                and (flag_to_score.team != base_at_flag_coordinates.team)
             ):
+                scoring_team = base_at_flag_coordinates.team
                 # own flag is at base or this is not required
-                if (self.board.flags_coordinates[base] == coordinates) or (
-                    not config["game"]["home_flag_required"]
-                ):
+                if (
+                    self.board.flags_coordinates[Flag(team=scoring_team)]
+                    == self.board.bases_coordinates[Base(team=scoring_team)]
+                ) or (not config["game"]["home_flag_required"]):
                     self.logger.info(
-                        f"{self.teams[base]} scored {self.teams[flag]} flag!"
+                        f"{scoring_team} scored {flag_to_score.team} flag!"
                     )
-                    self.scores[base] += 1
-                    self.board.flags_coordinates[flag] = self.board.bases_coordinates[
-                        flag
-                    ]
+                    self.scores[scoring_team] += 1
+                    # return the flag to the base it belongs to
+
                 else:
                     self.logger.warning("Can not score, flag not at home.")
 
-    def check_flag_return_conditions(self, actor: Actor) -> None:
+    def _check_flag_return_conditions(self, actor: Actor) -> None:
         coordinates = self.board.actors_coordinates[actor]
         if coordinates in self.board.flags_coordinates.values():
             flag = self.board.coordinates_flags[coordinates]
             # if flag is own flag, return it to base
-            if flag == actor.team.number:
-                self.board.flags_coordinates[flag] = self.board.bases_coordinates[flag]
-                self.check_score_conditions()
+            if flag.team == actor.team:
+                self.board.return_flag_to_base(flag)
+                self._check_score_conditions()
                 if actor.flag:
                     actor.flag = None
