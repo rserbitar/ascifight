@@ -2,10 +2,7 @@ from pydantic import BaseModel, ValidationError, Field
 from typing import TypeVar
 import structlog
 from structlog.contextvars import bind_contextvars, unbind_contextvars
-import enum
-import itertools
 import random
-import abc
 import toml
 import sys
 
@@ -249,9 +246,11 @@ class Game:
                 self.logger.warning(f"{actor} already moved this tick.")
             else:
                 # if the actor can move
-                already_moved[actor] = self.board.move(actor, direction)
-                if already_moved[actor]:
-                    self._check_flag_return_conditions(actor)
+                already_moved[actor], team_that_scored = self.board.move(
+                    actor, direction
+                )
+                if team_that_scored:
+                    self.scores[team_that_scored] += 1
 
         unbind_contextvars("team")
 
@@ -261,30 +260,11 @@ class Game:
             bind_contextvars(team=order.team)
             self.logger.info(f"Executing {order}")
             actor = self.teams_actors[(self.names_teams[order.team], order.actor)]
-            attack_successful = random.random() < actor.attack
 
             if already_attacked[actor]:
                 self.logger.warning(f"{actor} already attacked this tick.")
             else:
-                if not actor.attack:
-                    self.logger.warning(f"{actor} can not attack.")
-                else:
-                    direction = order.direction
-                    target_coordinates = self.board.calc_target_coordinates(
-                        actor, direction
-                    )
-                    target = self.board.coordinates_actors.get(target_coordinates)
-                    if target is None:
-                        self.logger.warning(
-                            f"No target on target coordinates {target_coordinates}."
-                        )
-                    else:
-                        if not attack_successful:
-                            self.logger.info(f"{actor} attacked and missed {target}.")
-                        else:
-                            self.logger.info(f"{actor} attacked and hit {target}.")
-                            self.board.respawn(target)
-                            already_attacked[actor] = True
+                already_attacked[actor] = self.board.attack(actor, order.direction)
 
         unbind_contextvars("team")
 
@@ -295,132 +275,16 @@ class Game:
             self.logger.info(f"Executing {order}")
             actor = self.teams_actors[(self.names_teams[order.team], order.actor)]
             if not already_grabbed[actor]:
-                target_coordinates = self.board.calc_target_coordinates(
+                already_grabbed[actor], team_that_scored = self.board.grabput_flag(
                     actor, order.direction
                 )
-
-                already_grabbed[actor] = self._grabput_flag(actor, target_coordinates)
+                if team_that_scored:
+                    self.scores[team_that_scored] += 1
             else:
                 self.logger.warning(f"{actor} already grabbed this tick.")
         unbind_contextvars("team")
-
-    def _grabput_flag(
-        self, actor: board.Actor, target_coordinates: board.Coordinates
-    ) -> bool:
-        grab_successful = random.random() < actor.grab
-        target_actor = self.board.coordinates_actors.get(target_coordinates)
-        already_grabbed = False
-        flag: board.Flag | None
-
-        if actor.flag is not None:
-            flag = actor.flag
-
-            if target_actor is not None:
-                if not target_actor.grab:
-                    self.logger.warning(
-                        f"{actor} can not hand the flag to actor {target_actor}. Can not have the flag."
-                    )
-
-                elif target_actor.flag is not None:
-                    self.logger.warning(
-                        f"{actor} can not hand the flag to actor {target_actor}. Target already has a flag."
-                    )
-
-                else:
-                    self.board.flags_coordinates[flag] = target_coordinates
-                    actor.flag = None
-                    target_actor.flag = flag
-                    already_grabbed = True
-                    self.logger.info(f"{actor} handed the flag to {target_actor}.")
-                    self._check_flag_return_conditions(target_actor)
-
-            # no target actor, means empty field, wall or base (even a flag???)
-            else:
-                if target_coordinates in self.board.walls_coordinates:
-                    self.logger.warning(f"{actor} can not hand the flag to a wall.")
-
-                # the flag was put on the field (maybe a base)
-                else:
-                    self.board.flags_coordinates[flag] = target_coordinates
-                    actor.flag = None
-                    already_grabbed = True
-                    self.logger.info(
-                        f"{actor} put the flag to coordinates {target_coordinates}."
-                    )
-                    self._check_score_conditions(flag)
-
-        # the actor does not have the flag
-        else:
-            flag = self.board.coordinates_flags.get(target_coordinates)
-            if flag is None:
-                self.logger.warning(f"No flag at coordinates {target_coordinates}.")
-            else:
-                if grab_successful:
-                    self.board.flags_coordinates[flag] = self.board.actors_coordinates[
-                        actor
-                    ]
-                    actor.flag = flag
-                    already_grabbed = True
-
-                    # and remove it from the target actor if there is one
-                    if target_actor is not None:
-                        target_actor.flag = None
-                        self.logger.info(
-                            f"{actor} grabbed the flag of {flag.team} from {target_actor}."
-                        )
-                    else:
-                        self.logger.info(f"{actor} grabbed the flag of {flag.team}.")
-                    self._check_flag_return_conditions(actor=actor)
-                else:
-                    self.logger.info(f"{actor} grabbed and missed the flag.")
-
-        return already_grabbed
 
     def check_game_end(self):
         return (
             self.tick == self.max_ticks or max(self.scores.values()) == self.max_score
         )
-
-    def _check_score_conditions(self, flag_to_score: board.Flag | None = None) -> None:
-        flags = (
-            [flag_to_score]
-            if flag_to_score
-            else [flag for flag in self.board.flags_coordinates.keys()]
-        )
-        for flag_to_score in flags:
-            score_flag_coordinates = self.board.flags_coordinates[flag_to_score]
-            base_at_flag_coordinates = self.board.coordinates_bases.get(
-                score_flag_coordinates
-            )
-            # if the flag is an enemy flag and owner flag is also there
-            if (
-                # flag is on a base
-                base_at_flag_coordinates is not None
-                # flag is not on it own base
-                and (flag_to_score.team != base_at_flag_coordinates.team)
-            ):
-                scoring_team = base_at_flag_coordinates.team
-                # own flag is at base or this is not required
-                if (
-                    self.board.flags_coordinates[board.Flag(team=scoring_team)]
-                    == self.board.bases_coordinates[board.Base(team=scoring_team)]
-                ) or (not config["game"]["home_flag_required"]):
-                    self.logger.info(
-                        f"{scoring_team} scored {flag_to_score.team} flag!"
-                    )
-                    self.scores[scoring_team] += 1
-                    # return the flag to the base it belongs to
-
-                else:
-                    self.logger.warning("Can not score, flag not at home.")
-
-    def _check_flag_return_conditions(self, actor: board.Actor) -> None:
-        coordinates = self.board.actors_coordinates[actor]
-        if coordinates in self.board.flags_coordinates.values():
-            flag = self.board.coordinates_flags[coordinates]
-            # if flag is own flag, return it to base
-            if flag.team == actor.team:
-                self.board.return_flag_to_base(flag)
-                self._check_score_conditions()
-                if actor.flag:
-                    actor.flag = None

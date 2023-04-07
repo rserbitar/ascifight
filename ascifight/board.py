@@ -266,9 +266,155 @@ class Board:
             new_coordinates.y = max(coordinates.y - 1, 0)
         return new_coordinates
 
-    def move(self, actor: Actor, direction: Directions) -> bool:
+    def move(self, actor: Actor, direction: Directions) -> tuple[bool, None | Team]:
+        team_that_scored = None
         new_coordinates = self.calc_target_coordinates(actor, direction)
-        return self._try_put_actor(actor, new_coordinates)
+        moved = self._try_put_actor(actor, new_coordinates)
+        if moved:
+            team_that_scored = self._check_flag_return_conditions(actor)
+        return moved, team_that_scored
+
+    def attack(self, actor: Actor, direction: Directions) -> bool:
+        attacked = False
+        if not actor.attack:
+            self.logger.warning(f"{actor} can not attack.")
+        else:
+            target_coordinates = self.calc_target_coordinates(actor, direction)
+            target = self.coordinates_actors.get(target_coordinates)
+            if target is None:
+                self.logger.warning(
+                    f"No target on target coordinates {target_coordinates}."
+                )
+            else:
+                attack_successful = random.random() < actor.attack
+                if not attack_successful:
+                    self.logger.info(f"{actor} attacked and missed {target}.")
+                else:
+                    self.logger.info(f"{actor} attacked and hit {target}.")
+                    self.respawn(target)
+                    attacked = True
+        return attacked
+
+    def grabput_flag(
+        self, actor: Actor, direction: Directions
+    ) -> tuple[bool, None | Team]:
+        team_that_scored = None
+        target_coordinates = self.calc_target_coordinates(actor, direction)
+
+        grab_successful = random.random() < actor.grab
+        target_actor = self.coordinates_actors.get(target_coordinates)
+        already_grabbed = False
+        flag: Flag | None
+
+        if actor.flag is not None:
+            flag = actor.flag
+
+            if target_actor is not None:
+                if not target_actor.grab:
+                    self.logger.warning(
+                        f"{actor} can not hand the flag to actor {target_actor}. Can not have the flag."
+                    )
+
+                elif target_actor.flag is not None:
+                    self.logger.warning(
+                        f"{actor} can not hand the flag to actor {target_actor}. Target already has a flag."
+                    )
+
+                else:
+                    self.flags_coordinates[flag] = target_coordinates
+                    actor.flag = None
+                    target_actor.flag = flag
+                    already_grabbed = True
+                    self.logger.info(f"{actor} handed the flag to {target_actor}.")
+                    team_that_scored = self._check_flag_return_conditions(target_actor)
+
+            # no target actor, means empty field, wall or base (even a flag???)
+            else:
+                if target_coordinates in self.walls_coordinates:
+                    self.logger.warning(f"{actor} can not hand the flag to a wall.")
+
+                # the flag was put on the field (maybe a base)
+                else:
+                    self.flags_coordinates[flag] = target_coordinates
+                    actor.flag = None
+                    already_grabbed = True
+                    self.logger.info(
+                        f"{actor} put the flag to coordinates {target_coordinates}."
+                    )
+                    team_that_scored = self._check_score_conditions(flag)
+
+        # the actor does not have the flag
+        else:
+            flag = self.coordinates_flags.get(target_coordinates)
+            if flag is None:
+                self.logger.warning(f"No flag at coordinates {target_coordinates}.")
+            else:
+                if grab_successful:
+                    self.flags_coordinates[flag] = self.actors_coordinates[actor]
+                    actor.flag = flag
+                    already_grabbed = True
+
+                    # and remove it from the target actor if there is one
+                    if target_actor is not None:
+                        target_actor.flag = None
+                        self.logger.info(
+                            f"{actor} grabbed the flag of {flag.team} from {target_actor}."
+                        )
+                    else:
+                        self.logger.info(f"{actor} grabbed the flag of {flag.team}.")
+                    team_that_scored = self._check_flag_return_conditions(actor=actor)
+                else:
+                    self.logger.info(f"{actor} grabbed and missed the flag.")
+
+        return already_grabbed, team_that_scored
+
+    def _check_score_conditions(self, flag_to_score: Flag | None = None) -> Team | None:
+        team_that_scored = None
+        flags = (
+            [flag_to_score]
+            if flag_to_score
+            else [flag for flag in self.flags_coordinates.keys()]
+        )
+        for flag_to_score in flags:
+            score_flag_coordinates = self.flags_coordinates[flag_to_score]
+            base_at_flag_coordinates = self.coordinates_bases.get(
+                score_flag_coordinates
+            )
+            # if the flag is an enemy flag and owner flag is also there
+            if (
+                # flag is on a base
+                base_at_flag_coordinates is not None
+                # flag is not on it own base
+                and (flag_to_score.team != base_at_flag_coordinates.team)
+            ):
+                scoring_team = base_at_flag_coordinates.team
+                # own flag is at base or this is not required
+                if (
+                    self.flags_coordinates[Flag(team=scoring_team)]
+                    == self.bases_coordinates[Base(team=scoring_team)]
+                ) or (not config["game"]["home_flag_required"]):
+                    self.logger.info(
+                        f"{scoring_team} scored {flag_to_score.team} flag!"
+                    )
+                    team_that_scored = scoring_team
+                    # return the flag to the base it belongs to
+
+                else:
+                    self.logger.warning("Can not score, flag not at home.")
+        return team_that_scored
+
+    def _check_flag_return_conditions(self, actor: Actor) -> Team | None:
+        team_that_scored = None
+        coordinates = self.actors_coordinates[actor]
+        if coordinates in self.flags_coordinates.values():
+            flag = self.coordinates_flags[coordinates]
+            # if flag is own flag, return it to base
+            if flag.team == actor.team:
+                self.return_flag_to_base(flag)
+                team_that_scored = self._check_score_conditions()
+                if actor.flag:
+                    actor.flag = None
+        return team_that_scored
 
     def image(self) -> str:
         field = [["___" for _ in range(self.map_size)] for _ in range(self.map_size)]
