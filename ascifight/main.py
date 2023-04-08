@@ -100,7 +100,7 @@ structlog.configure(
 )
 
 root_logger = logging.getLogger()
-logger = structlog.get_logger()
+_logger = structlog.get_logger()
 
 
 description = """
@@ -338,7 +338,7 @@ async def grabput_order(order: game.GrabPutOrder) -> dict[str, str]:
 async def get_game_state() -> StateResponse:
     """Get the current state of the game including locations of all actors, flags, bases and walls."""
     return StateResponse(
-        teams=my_game.teams,
+        teams=[team.name for team in my_game.board.teams],
         actors=[
             ActorDescription(
                 team=actor.team.name,
@@ -361,7 +361,7 @@ async def get_game_state() -> StateResponse:
 @app.get("/game_rules", tags=["states"])
 async def get_game_rules() -> RulesResponse:
     """Get the current rules and actor properties."""
-    actor_properties = my_game.get_actor_properties()
+    actor_properties = my_game.board.get_actor_properties()
     return RulesResponse(actor_properties=actor_properties)
 
 
@@ -402,12 +402,12 @@ async def single_game() -> None:
     for handler in root_logger.handlers:
         if isinstance(handler, logging.handlers.RotatingFileHandler):
             handler.doRollover()
-    my_game = game.Game(game_board=board.Board(walls=0))
+    my_game = game.Game()
 
-    logger.info("Initiating game.")
+    _logger.info("Initiating game.")
     my_game.initiate_game()
 
-    logger.info("Starting pre-game.")
+    _logger.info("Starting pre-game.")
     while pre_game_wait > 0:
         await asyncio.sleep(1)
         pre_game_wait -= 1
@@ -423,14 +423,14 @@ async def single_game() -> None:
         print(my_game.scoreboard())
         print(my_game.board.image())
 
-        logger.info("Starting tick execution.")
+        _logger.info("Starting tick execution.")
         my_game.execute_game_step(commands)
 
-        logger.info("Waiting for game commands.")
+        _logger.info("Waiting for game commands.")
         time_of_next_execution = datetime.datetime.now() + datetime.timedelta(
             0, config["server"]["tick_wait_time"]
         )
-        logger.info(f"Time of next execution: {time_of_next_execution}")
+        _logger.info(f"Time of next execution: {time_of_next_execution}")
 
         await asyncio.sleep(config["server"]["tick_wait_time"])
     my_game.end_game()

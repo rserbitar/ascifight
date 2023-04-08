@@ -7,7 +7,7 @@ import toml
 import sys
 
 import board
-import util
+import ascifight.util as util
 
 with open("config.toml", mode="r") as fp:
     config = toml.load(fp)
@@ -77,9 +77,7 @@ class GrabPutOrder(Order):
 class Game:
     def __init__(
         self,
-        game_board: board.Board,
-        teams: list[dict[str, str]] = config["teams"],
-        actors: list[str] = config["game"]["actors"],
+        game_board: board.Board = board.Board(),
         score_file=config["server"]["scores_file"],
         score_multiplier: int = config["game"]["score_multiplier"],
         max_ticks: int = config["game"]["max_ticks"],
@@ -88,39 +86,19 @@ class Game:
         self.logger = structlog.get_logger()
         self.score_file = score_file
         self.score_multiplier = score_multiplier
-        self.actors: list[type[board.Actor]] = [
-            self._get_actor(actor) for actor in actors
-        ]
+
         self.board = game_board
-        self.teams: list[str] = [team["name"] for team in teams]
-        self.names_teams: dict[str, board.Team] = {
-            team["name"]: board.Team(
-                name=team["name"], password=team["password"], number=i
-            )
-            for i, team in enumerate(teams)
-        }
-        self.teams_actors: dict[tuple[board.Team, int], board.Actor] = {}
+
         self.scores: dict[board.Team, int] = {}
         self.overall_score: dict[board.Team, int] = {}
         self.tick = 0
         self.max_ticks = max_ticks
         self.max_score = max_score
 
-    @property
-    def actors_of_team(self) -> dict[str, list[board.Actor]]:
-        actors_of_team = {}
-        for team in self.names_teams.values():
-            actors = []
-            for i in range(len(self.actors)):
-                actors.append(self.teams_actors[(team, i)])
-            actors_of_team[team.name] = actors
-        return actors_of_team
-
     def initiate_game(self) -> None:
         self._set_scores()
         self._read_scores()
-        self._create_team_actors()
-        self._place_board_objects()
+        self.board.place_board_objects()
 
     def end_game(self):
         self._write_scores()
@@ -165,14 +143,8 @@ class Game:
         )
         return f"{util.colors['bold']}Overall Score{util.colors['revert']}: {overall_score} \n{util.colors['bold']}Current Score{util.colors['revert']}: {current_score}"
 
-    def get_actor_properties(self) -> list[board.ActorProperty]:
-        return [actor.get_properties() for actor in self.actors]
-
-    def _get_actor(self, actor: str) -> type[board.Actor]:
-        return getattr(sys.modules[__name__], actor)
-
     def _set_scores(self) -> None:
-        for team in self.names_teams.values():
+        for team in self.board.names_teams.values():
             self.scores[team] = 0
             self.overall_score[team] = 0
 
@@ -198,7 +170,7 @@ class Game:
                     score = int(score)
                     team = team.strip()
                     try:
-                        self.overall_score[self.names_teams[team]] += score
+                        self.overall_score[self.board.names_teams[team]] += score
                     # ignore score if team is not in current teams
                     except ValueError:
                         pass
@@ -206,29 +178,16 @@ class Game:
         except FileNotFoundError:
             pass
 
-    def _place_board_objects(self) -> None:
-        self.board.place_bases_and_flags(list(self.names_teams.values()))
-        for team in self.names_teams.values():
-            coordinates = self.board.bases_coordinates[board.Base(team=team)]
-            actors = [self.teams_actors[(team, a)] for a in range(len(self.actors))]
-            self.board.place_actors(actors, coordinates)
-        self.board.place_walls()
-
-    def _create_team_actors(self) -> None:
-        for team in self.names_teams.values():
-            for number, actor in enumerate(self.actors):
-                self.teams_actors[(team, number)] = actor(ident=number, team=team)
-
     def _actor_dict(self, value: T) -> dict[board.Actor, T]:
         value_dict = {}
-        for actor in self.teams_actors.values():
+        for actor in self.board.teams_actors.values():
             value_dict[actor] = value
         return value_dict
 
     def _validate_order(self, order: Order) -> bool:
         check = False
-        if order.team in self.names_teams.keys():
-            check = self.names_teams[order.team].password == order.password
+        if order.team in self.board.names_teams.keys():
+            check = self.board.names_teams[order.team].password == order.password
             if not check:
                 self.logger.warning(f"{order} was ignored. Wrong password.")
         else:
@@ -240,7 +199,9 @@ class Game:
         for order in move_orders:
             bind_contextvars(team=order.team)
             self.logger.info(f"Executing {order}")
-            actor = self.teams_actors[(self.names_teams[order.team], order.actor)]
+            actor = self.board.teams_actors[
+                (self.board.names_teams[order.team], order.actor)
+            ]
             direction = order.direction
             if already_moved[actor]:
                 self.logger.warning(f"{actor} already moved this tick.")
@@ -259,7 +220,9 @@ class Game:
         for order in attack_orders:
             bind_contextvars(team=order.team)
             self.logger.info(f"Executing {order}")
-            actor = self.teams_actors[(self.names_teams[order.team], order.actor)]
+            actor = self.board.teams_actors[
+                (self.board.names_teams[order.team], order.actor)
+            ]
 
             if already_attacked[actor]:
                 self.logger.warning(f"{actor} already attacked this tick.")
@@ -273,7 +236,9 @@ class Game:
         for order in grabput_orders:
             bind_contextvars(team=order.team)
             self.logger.info(f"Executing {order}")
-            actor = self.teams_actors[(self.names_teams[order.team], order.actor)]
+            actor = self.board.teams_actors[
+                (self.board.names_teams[order.team], order.actor)
+            ]
             if not already_grabbed[actor]:
                 already_grabbed[actor], team_that_scored = self.board.grabput_flag(
                     actor, order.direction
