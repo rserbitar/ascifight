@@ -6,7 +6,7 @@ import random
 import toml
 import sys
 
-import board
+import ascifight.board as board
 import ascifight.util as util
 
 with open("config.toml", mode="r") as fp:

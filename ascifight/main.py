@@ -10,8 +10,8 @@ import structlog
 from structlog.contextvars import bind_contextvars
 import toml
 
-import game
-import board
+import ascifight.game as game
+import ascifight.board as board
 
 with open("config.toml", mode="r") as fp:
     config = toml.load(fp)
@@ -228,13 +228,15 @@ tags_metadata = [
 
 
 class ActorDescription(BaseModel):
-    team: str = Field(description="The name of the actor's team.")
     type: str = Field(description="The type of the actor determining its capabilities.")
+    team: str = Field(description="The name of the actor's team.")
     ident: int = Field(description="The identity number specific to the team.")
     flag: str | None = Field(
         description="If and which teams flag the actor is carrying."
     )
-    coordinates: board.Coordinates
+    coordinates: board.Coordinates = Field(
+        description="The current coordinates fo the actor."
+    )
 
 
 class StateResponse(BaseModel):
@@ -341,8 +343,8 @@ async def get_game_state() -> StateResponse:
         teams=[team.name for team in my_game.board.teams],
         actors=[
             ActorDescription(
-                team=actor.team.name,
                 type=actor.__class__.__name__,
+                team=actor.team.name,
                 ident=actor.ident,
                 flag=actor.flag.team.name if actor.flag else None,
                 coordinates=coordinates,
