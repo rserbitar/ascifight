@@ -19,8 +19,6 @@ import ascifight.util as util
 
 with open("config.toml", mode="r") as fp:
     config = toml.load(fp)
-
-
 try:
     os.mkdir(config["server"]["log_dir"])
 except FileExistsError:
