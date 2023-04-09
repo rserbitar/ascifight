@@ -4,7 +4,6 @@ import structlog
 
 import random
 import enum
-import itertools
 
 import ascifight.board_data as board_data
 import ascifight.util as util
