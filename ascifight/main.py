@@ -11,7 +11,8 @@ from structlog.contextvars import bind_contextvars
 import toml
 
 import ascifight.game as game
-import ascifight.board as board
+import ascifight.board_data as board_data
+import ascifight.board_actions as board_actions
 import ascifight.draw as draw
 import ascifight.util as util
 
@@ -240,7 +241,7 @@ class ActorDescription(BaseModel):
     flag: str | None = Field(
         description="If and which teams flag the actor is carrying."
     )
-    coordinates: board.Coordinates = Field(
+    coordinates: board_data.Coordinates = Field(
         description="The current coordinates fo the actor."
     )
 
@@ -252,13 +253,13 @@ class StateResponse(BaseModel):
     actors: list[ActorDescription] = Field(
         description="A list of all actors in the game."
     )
-    flags: list[board.Coordinates] = Field(
+    flags: list[board_data.Coordinates] = Field(
         description="A list of all flags in the game. The flags are ordered according to the teams they belong to."
     )
-    bases: list[board.Coordinates] = Field(
+    bases: list[board_data.Coordinates] = Field(
         description="A list of all bases in the game. The bases are ordered according to the teams they belong to."
     )
-    walls: list[board.Coordinates] = Field(
+    walls: list[board_data.Coordinates] = Field(
         description="A list of all walls in the game. Actors can not enter wall fields."
     )
     scores: list[int] = Field(
@@ -297,7 +298,7 @@ class RulesResponse(BaseModel):
         default=config["game"]["home_flag_required"],
         description="Is the flag required to be at home to score?",
     )
-    actor_properties: list[board.ActorProperty]
+    actor_properties: list[board_data.ActorProperty]
 
 
 app = FastAPI(
@@ -515,13 +516,19 @@ async def ai_generator():
         await asyncio.sleep(5)
         await command_queue.put(
             game.MoveOrder(
-                team="Team 1", password="1", actor=0, direction=board.Directions.down
+                team="Team 1",
+                password="1",
+                actor=0,
+                direction=board_actions.Directions.down,
             )
         )
         await asyncio.sleep(5)
         await command_queue.put(
             game.MoveOrder(
-                team="Team 2", password="2", actor=0, direction=board.Directions.right
+                team="Team 2",
+                password="2",
+                actor=0,
+                direction=board_actions.Directions.right,
             )
         )
 
