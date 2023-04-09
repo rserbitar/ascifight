@@ -2,6 +2,7 @@ import datetime
 import logging, logging.config, logging.handlers
 import asyncio
 import os
+import importlib
 
 from fastapi import FastAPI, Response
 from fastapi.staticfiles import StaticFiles
@@ -111,19 +112,15 @@ class TimingResponse(BaseModel):
 
 class RulesResponse(BaseModel):
     map_size: int = Field(
-        default=config["game"]["map_size"],
         description="The length of the game board in x and y.",
     )
     max_ticks: int = Field(
-        default=config["game"]["max_ticks"],
         description="The maximum number of ticks the game will last.",
     )
     max_score: int = Field(
-        default=config["game"]["max_score"],
         description="The maximum score that will force the game to end.",
     )
-    home_Flag_not_required: bool = Field(
-        default=config["game"]["home_flag_required"],
+    home_flag_required: bool = Field(
         description="Is the flag required to be at home to score?",
     )
     actor_properties: list[board_data.ActorProperty]
@@ -199,7 +196,13 @@ async def get_game_state() -> StateResponse:
 async def get_game_rules() -> RulesResponse:
     """Get the current rules and actor properties."""
     actor_properties = my_game.board.get_actor_properties()
-    return RulesResponse(actor_properties=actor_properties)
+    return RulesResponse(
+        map_size=config["game"]["map_size"],
+        max_ticks=config["game"]["max_ticks"],
+        max_score=config["game"]["max_score"],
+        home_flag_required=config["game"]["home_flag_required"],
+        actor_properties=actor_properties,
+    )
 
 
 @app.get("/timing", tags=["states"])
@@ -283,6 +286,11 @@ async def single_game() -> None:
     global pre_game_wait
     global time_of_next_execution
     global time_to_next_execution
+    global config
+
+    with open("config.toml", mode="r") as fp:
+        config = toml.load(fp)
+    importlib.reload(game)
 
     pre_game_wait = config["server"]["pre_game_wait"]
     for handler in root_logger.handlers:

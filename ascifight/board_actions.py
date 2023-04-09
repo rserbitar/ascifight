@@ -6,10 +6,6 @@ import random
 import enum
 
 import ascifight.board_data as board_data
-import ascifight.util as util
-
-with open("config.toml", mode="r") as fp:
-    config = toml.load(fp)
 
 
 class Directions(str, enum.Enum):
@@ -26,6 +22,8 @@ class BoardActions:
     ):
         self._logger = structlog.get_logger()
         self.board_data = game_board_data
+        with open("config.toml", mode="r") as fp:
+            self.config = toml.load(fp)
 
     def calc_target_coordinates(
         self, actor: board_data.Actor, direction: Directions
@@ -178,7 +176,7 @@ class BoardActions:
                     == self.board_data.bases_coordinates[
                         board_data.Base(team=scoring_team)
                     ]
-                ) or (not config["game"]["home_flag_required"]):
+                ) or (not self.config["game"]["home_flag_required"]):
                     self._logger.info(
                         f"{scoring_team} scored {flag_to_score.team} flag!"
                     )

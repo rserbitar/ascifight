@@ -7,18 +7,15 @@ import itertools
 
 import ascifight.board_data as board_data
 
-with open("config.toml", mode="r") as fp:
-    config = toml.load(fp)
-
 
 class BoardSetup:
     def __init__(
         self,
         game_board_data: board_data.BoardData,
-        teams: list[dict[str, str]] = config["teams"],
-        actors: list[str] = config["game"]["actors"],
-        map_size: int = config["game"]["map_size"],
-        walls: int = config["game"]["walls"],
+        teams: list[dict[str, str]],
+        actors: list[str],
+        map_size: int,
+        walls: int,
     ):
         self._logger = structlog.get_logger()
 

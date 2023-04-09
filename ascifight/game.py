@@ -96,7 +96,13 @@ class Game:
         self.max_score = max_score
 
     def initiate_game(self) -> None:
-        game_board_setup = board_setup.BoardSetup(self.board)
+        game_board_setup = board_setup.BoardSetup(
+            game_board_data=self.board,
+            teams=config["teams"],
+            actors=config["game"]["actors"],
+            map_size=config["game"]["map_size"],
+            walls=config["game"]["walls"],
+        )
         game_board_setup.initialize_map()
         self._set_scores()
         self._read_scores()
