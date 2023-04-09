@@ -220,7 +220,9 @@ class Board:
         field = [["___" for _ in range(self.map_size)] for _ in range(self.map_size)]
 
         for i, base in enumerate(self.bases_coordinates.values()):
-            field[base.y][base.x] = f" {util.colors[i]}\u25D9{util.colors['revert']} "
+            field[base.y][
+                base.x
+            ] = f" {util.colors[i]}{util.base_icon}{util.colors['revert']} "
         for actor, coordinates in self.actors_coordinates.items():
             char = actor.__class__.__name__[0].upper()
             number = actor.ident
@@ -232,10 +234,10 @@ class Board:
             color = util.colors[flag.team.number]
             before = field[coordinates.y][coordinates.x]
             field[coordinates.y][coordinates.x] = (
-                before[:-2] + f" {color}\u25B2{util.colors['revert']}"
+                before[:-2] + f" {color}{util.flag_icon}{util.colors['revert']}"
             )
         for wall_coordinate in self.walls_coordinates:
-            field[wall_coordinate.y][wall_coordinate.x] = "\u2588\u2588\u2588"
+            field[wall_coordinate.y][wall_coordinate.x] = util.wall_icon
         for row in field:
             row.append("\n")
         # reverse so (0,0) is lower left not upper left
