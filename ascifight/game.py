@@ -8,6 +8,7 @@ import ascifight.util as util
 import ascifight.board_data as board_data
 import ascifight.board_setup as board_setup
 import ascifight.board_actions as board_actions
+import ascifight.board_computations as board_computations
 
 with open("config.toml", mode="r") as fp:
     config = toml.load(fp)
@@ -32,7 +33,7 @@ class AttackOrder(Order):
         ge=0,
         le=len(config["game"]["actors"]) - 1,
     )
-    direction: board_actions.Directions = Field(
+    direction: board_computations.Directions = Field(
         title="Direction",
         description="The direction to attack from the position of the actor.",
     )
@@ -47,7 +48,7 @@ class MoveOrder(Order):
         ge=0,
         le=len(config["game"]["actors"]) - 1,
     )
-    direction: board_actions.Directions = Field(
+    direction: board_computations.Directions = Field(
         title="Direction",
         description="The direction to move to from the position of the actor. 'up' increases the y coordinate and 'right' increases the x coordinate.",
     )
@@ -63,7 +64,7 @@ class GrabPutOrder(Order):
         ge=0,
         le=len(config["game"]["actors"]) - 1,
     )
-    direction: board_actions.Directions = Field(
+    direction: board_computations.Directions = Field(
         title="Direction",
         description=(
             "The direction to grab of put the flag from the position of the actor. "

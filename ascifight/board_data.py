@@ -196,6 +196,17 @@ class BoardData:
     def coordinates_bases(self) -> dict[Coordinates, Base]:
         return {v: k for k, v in self.bases_coordinates.items()}
 
+    def board_objects_coordinates(self, board_object: BoardObject) -> Coordinates:
+        match board_object:
+            case Flag():
+                coordinates = self.flags_coordinates[board_object]
+            case Base():
+                coordinates = self.bases_coordinates[board_object]
+            case Actor():
+                coordinates = self.actors_coordinates[board_object]
+        # ignore unbound variable, if it crashes it should be fixed
+        return coordinates  # type: ignore
+
     def _get_actor(self, actor: str) -> type[Actor]:
         return getattr(sys.modules[__name__], actor)
 

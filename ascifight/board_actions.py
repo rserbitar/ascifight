@@ -4,15 +4,10 @@ import structlog
 
 import random
 import enum
+import math
 
 import ascifight.board_data as board_data
-
-
-class Directions(str, enum.Enum):
-    left = "left"
-    right = "right"
-    down = "down"
-    up = "up"
+import ascifight.board_computations as board_computations
 
 
 class BoardActions:
@@ -26,22 +21,40 @@ class BoardActions:
             self.config = toml.load(fp)
 
     def calc_target_coordinates(
-        self, actor: board_data.Actor, direction: Directions
+        self,
+        origin: board_data.Actor | board_data.Coordinates,
+        direction: board_computations.Directions,
     ) -> board_data.Coordinates:
-        coordinates = self.board_data.actors_coordinates[actor]
-        new_coordinates = board_data.Coordinates(x=coordinates.x, y=coordinates.y)
-        if direction == direction.right:
-            new_coordinates.x = min(coordinates.x + 1, self.board_data.map_size - 1)
-        if direction == direction.left:
-            new_coordinates.x = max(coordinates.x - 1, 0)
-        if direction == direction.up:
-            new_coordinates.y = min(coordinates.y + 1, self.board_data.map_size - 1)
-        if direction == direction.down:
-            new_coordinates.y = max(coordinates.y - 1, 0)
-        return new_coordinates
+        coordinates = (
+            origin
+            if isinstance(origin, board_data.Coordinates)
+            else self.board_data.actors_coordinates[origin]
+        )
+        return board_computations.calc_target_coordinates(
+            coordinates, direction, self.board_data.map_size
+        )
+
+    def calc_target_direction(
+        self,
+        origin: board_data.BoardObject | board_data.Coordinates,
+        target: board_data.BoardObject | board_data.Coordinates,
+    ) -> list[board_computations.Directions]:
+        origin_coordinates = (
+            origin
+            if isinstance(origin, board_data.Coordinates)
+            else self.board_data.board_objects_coordinates(origin)
+        )
+        target_coordinates = (
+            target
+            if isinstance(target, board_data.Coordinates)
+            else self.board_data.board_objects_coordinates(target)
+        )
+        return board_computations.calc_target_coordinate_direction(
+            origin=origin_coordinates, target=target_coordinates
+        )
 
     def move(
-        self, actor: board_data.Actor, direction: Directions
+        self, actor: board_data.Actor, direction: board_computations.Directions
     ) -> tuple[bool, None | board_data.Team]:
         team_that_scored = None
         new_coordinates = self.calc_target_coordinates(actor, direction)
@@ -50,7 +63,9 @@ class BoardActions:
             team_that_scored = self._check_flag_return_conditions(actor)
         return moved, team_that_scored
 
-    def attack(self, actor: board_data.Actor, direction: Directions) -> bool:
+    def attack(
+        self, actor: board_data.Actor, direction: board_computations.Directions
+    ) -> bool:
         attacked = False
         if not actor.attack:
             self._logger.warning(f"{actor} can not attack.")
@@ -72,7 +87,7 @@ class BoardActions:
         return attacked
 
     def grabput_flag(
-        self, actor: board_data.Actor, direction: Directions
+        self, actor: board_data.Actor, direction: board_computations.Directions
     ) -> tuple[bool, None | board_data.Team]:
         team_that_scored = None
         target_coordinates = self.calc_target_coordinates(actor, direction)

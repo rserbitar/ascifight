@@ -13,7 +13,6 @@ import toml
 
 import ascifight.game as game
 import ascifight.board_data as board_data
-import ascifight.board_actions as board_actions
 import ascifight.draw as draw
 import ascifight.util as util
 
@@ -345,6 +344,8 @@ async def get_all_queue_items(
 
 
 async def ai_generator():
+    import board_computations
+
     await asyncio.sleep(1)
     while True:
         await asyncio.sleep(5)
@@ -353,7 +354,7 @@ async def ai_generator():
                 team="Team 1",
                 password="1",
                 actor=0,
-                direction=board_actions.Directions.down,
+                direction=board_computations.Directions.down,
             )
         )
         await asyncio.sleep(5)
@@ -362,7 +363,7 @@ async def ai_generator():
                 team="Team 2",
                 password="2",
                 actor=0,
-                direction=board_actions.Directions.right,
+                direction=board_computations.Directions.right,
             )
         )
 
