@@ -6,6 +6,8 @@ import importlib
 
 from fastapi import FastAPI, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.responses import FileResponse
+
 from pydantic import BaseModel, Field
 import structlog
 from structlog.contextvars import bind_contextvars
@@ -271,6 +273,11 @@ def get_image() -> Response:
     image = draw.draw_map(actors + bases + walls, flags)
     # media_type here sets the media type of the actual response sent to the client.
     return Response(content=image, media_type="image/png")
+
+
+@app.get("/status")
+async def read_index():
+    return FileResponse("templates/index.html")
 
 
 async def routine():
