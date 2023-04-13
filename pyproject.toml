@@ -7,18 +7,18 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-fastapi = "^0.89.1"
-pydantic = "^1.10.4"
-uvicorn = {extras = ["standard"], version = "^0.20.0"}
-structlog = "^22.3.0"
+fastapi = "^0.95.0"
+pydantic = "^1.10.7"
+uvicorn = "^0.21.1"
+structlog = "^23.1.0"
 context-logging = "^1.1.0"
 toml = "^0.10.2"
 pillow = "^9.5.0"
 
 
 [tool.poetry.group.dev.dependencies]
-mypy = "^0.991"
-black = "^23.1.0"
+mypy = "^1.2.0"
+black = "^23.3.0"
 types-toml = "^0.10.8.6"
 
 [build-system]
