@@ -1,4 +1,5 @@
 import io
+import os
 
 import pydantic
 from PIL import Image, ImageDraw, ImageFont
@@ -7,7 +8,8 @@ import toml
 import ascifight.board_data as board_data
 import ascifight.util as util
 
-with open("config.toml", mode="r") as fp:
+absolute_path = os.path.dirname(__file__)
+with open(f"{absolute_path}/config.toml", mode="r") as fp:
     config = toml.load(fp)
 
 

@@ -1,8 +1,11 @@
+import os
+
 from pydantic import BaseModel, ValidationError, Field
 from typing import TypeVar
 import structlog
 from structlog.contextvars import bind_contextvars, unbind_contextvars
 import toml
+
 
 import ascifight.util as util
 import ascifight.board_data as board_data
@@ -10,7 +13,8 @@ import ascifight.board_setup as board_setup
 import ascifight.board_actions as board_actions
 import ascifight.board_computations as board_computations
 
-with open("config.toml", mode="r") as fp:
+absolute_path = os.path.dirname(__file__)
+with open(f"{absolute_path}/config.toml", mode="r") as fp:
     config = toml.load(fp)
 
 

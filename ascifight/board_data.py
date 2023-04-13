@@ -1,7 +1,7 @@
-import enum
 import abc
 import sys
 import itertools
+import os
 
 from pydantic import BaseModel, Field
 import toml
@@ -9,7 +9,8 @@ import structlog
 
 import ascifight.util as util
 
-with open("config.toml", mode="r") as fp:
+absolute_path = os.path.dirname(__file__)
+with open(f"{absolute_path}/config.toml", mode="r") as fp:
     config = toml.load(fp)
 
 

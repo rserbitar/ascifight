@@ -18,8 +18,10 @@ import ascifight.board_data as board_data
 import ascifight.draw as draw
 import ascifight.util as util
 
-with open("config.toml", mode="r") as fp:
+absolute_path = os.path.dirname(__file__)
+with open(f"{absolute_path}/config.toml", mode="r") as fp:
     config = toml.load(fp)
+
 try:
     os.mkdir(config["server"]["log_dir"])
 except FileExistsError:
