@@ -80,6 +80,20 @@ class ActorDescription(BaseModel):
     )
 
 
+class FlagDescription(BaseModel):
+    team: str = Field(description="The name of the flags's team.")
+    coordinates: board_data.Coordinates = Field(
+        description="The current coordinates fo the flag."
+    )
+
+
+class BaseDescription(BaseModel):
+    team: str = Field(description="The name of the base's team.")
+    coordinates: board_data.Coordinates = Field(
+        description="The current coordinates fo the base."
+    )
+
+
 class StateResponse(BaseModel):
     teams: list[str] = Field(
         description="A list of all teams in the game. This is also the order of flags and bases."
@@ -87,10 +101,10 @@ class StateResponse(BaseModel):
     actors: list[ActorDescription] = Field(
         description="A list of all actors in the game."
     )
-    flags: list[board_data.Coordinates] = Field(
+    flags: list[FlagDescription] = Field(
         description="A list of all flags in the game. The flags are ordered according to the teams they belong to."
     )
-    bases: list[board_data.Coordinates] = Field(
+    bases: list[BaseDescription] = Field(
         description="A list of all bases in the game. The bases are ordered according to the teams they belong to."
     )
     walls: list[board_data.Coordinates] = Field(
@@ -257,8 +271,14 @@ async def get_game_state() -> StateResponse:
             )
             for actor, coordinates in my_game.board.actors_coordinates.items()
         ],
-        flags=list(my_game.board.flags_coordinates.values()),
-        bases=list(my_game.board.bases_coordinates.values()),
+        flags=[
+            FlagDescription(team=flag.team.name, coordinates=coordinates)
+            for flag, coordinates in my_game.board.flags_coordinates.items()
+        ],
+        bases=[
+            BaseDescription(team=base.team.name, coordinates=coordinates)
+            for base, coordinates in my_game.board.bases_coordinates.items()
+        ],
         walls=list(my_game.board.walls_coordinates),
         scores=list(my_game.scores.values()),
         tick=my_game.tick,
