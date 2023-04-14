@@ -95,24 +95,16 @@ class BaseDescription(BaseModel):
 
 
 class StateResponse(BaseModel):
-    teams: list[str] = Field(
-        description="A list of all teams in the game. This is also the order of flags and bases."
-    )
+    teams: list[str] = Field(description="A list of all teams in the game.")
     actors: list[ActorDescription] = Field(
         description="A list of all actors in the game."
     )
-    flags: list[FlagDescription] = Field(
-        description="A list of all flags in the game. The flags are ordered according to the teams they belong to."
-    )
-    bases: list[BaseDescription] = Field(
-        description="A list of all bases in the game. The bases are ordered according to the teams they belong to."
-    )
+    flags: list[FlagDescription] = Field(description="A list of all flags in the game.")
+    bases: list[BaseDescription] = Field(description="A list of all bases in the game.")
     walls: list[board_data.Coordinates] = Field(
         description="A list of all walls in the game. Actors can not enter wall fields."
     )
-    scores: list[int] = Field(
-        description="A list of the current scores. The scored are ordered according to the teams they belong to."
-    )
+    scores: dict[str, int] = Field(description="A dictionary of the current scores.")
     tick: int = Field(description="The last game tick.")
     time_of_next_execution: datetime.datetime = Field(
         description="The time of next execution."
@@ -280,7 +272,7 @@ async def get_game_state() -> StateResponse:
             for base, coordinates in my_game.board.bases_coordinates.items()
         ],
         walls=list(my_game.board.walls_coordinates),
-        scores=list(my_game.scores.values()),
+        scores={team.name: score for team, score in my_game.scores.items()},
         tick=my_game.tick,
         time_of_next_execution=time_of_next_execution,
     )
