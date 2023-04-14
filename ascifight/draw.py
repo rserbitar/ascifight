@@ -5,16 +5,13 @@ import pydantic
 from PIL import Image, ImageDraw, ImageFont
 import toml
 
+import ascifight.config as config
 import ascifight.board_data as board_data
 import ascifight.util as util
 
-absolute_path = os.path.dirname(__file__)
-with open(f"{absolute_path}/config.toml", mode="r") as fp:
-    config = toml.load(fp)
 
-
-factor = int(config["image"]["size"] / config["game"]["map_size"])
-map_size: int = config["game"]["map_size"]
+factor = int(config.config["image"]["size"] / config.config["game"]["map_size"])
+map_size: int = config.config["game"]["map_size"]
 
 
 class Icon(pydantic.BaseModel):
@@ -60,7 +57,7 @@ def draw_map(
     annotations: list[Icon],
 ) -> bytes:
     # Create new black image of entire board
-    w, h = config["game"]["map_size"], config["game"]["map_size"]
+    w, h = config.config["game"]["map_size"], config.config["game"]["map_size"]
     img = Image.new("RGB", (w, h), (55, 55, 55))
     pixels = img.load()
 

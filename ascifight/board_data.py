@@ -7,11 +7,8 @@ from pydantic import BaseModel, Field
 import toml
 import structlog
 
+import ascifight.config as config
 import ascifight.util as util
-
-absolute_path = os.path.dirname(__file__)
-with open(f"{absolute_path}/config.toml", mode="r") as fp:
-    config = toml.load(fp)
 
 
 class Team(BaseModel):
@@ -33,12 +30,12 @@ class Coordinates(BaseModel):
     x: int = Field(
         description="X coordinate is decreased by the 'left' and increased by the 'right' direction.",
         ge=0,
-        le=config["game"]["map_size"] - 1,
+        le=config.config["game"]["map_size"] - 1,
     )
     y: int = Field(
         description="Y coordinate is decreased by the 'down' and increased by the 'up' direction.",
         ge=0,
-        le=config["game"]["map_size"] - 1,
+        le=config.config["game"]["map_size"] - 1,
     )
 
     def __str__(self) -> str:
@@ -150,10 +147,10 @@ class Wall(BoardObject):
 class BoardData:
     def __init__(
         self,
-        teams: list[dict[str, str]] = config["teams"],
-        actors: list[str] = config["game"]["actors"],
-        map_size: int = config["game"]["map_size"],
-        walls: int = config["game"]["walls"],
+        teams: list[dict[str, str]] = config.config["teams"],
+        actors: list[str] = config.config["game"]["actors"],
+        map_size: int = config.config["game"]["map_size"],
+        walls: int = config.config["game"]["walls"],
     ) -> None:
         self._logger = structlog.get_logger()
 

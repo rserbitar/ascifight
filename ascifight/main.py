@@ -2,7 +2,6 @@ import datetime
 import logging, logging.config, logging.handlers
 import asyncio
 import os
-import importlib
 import secrets
 from typing import Annotated
 
@@ -16,18 +15,18 @@ import structlog
 from structlog.contextvars import bind_contextvars
 import toml
 
+import ascifight.config as config
+import ascifight.globals as globals
 import ascifight.game as game
 import ascifight.board_data as board_data
 import ascifight.board_computations as board_computations
 import ascifight.draw as draw
 import ascifight.util as util
+import ascifight.game_loop as game_loop
 
-absolute_path = os.path.dirname(__file__)
-with open(f"{absolute_path}/config.toml", mode="r") as fp:
-    config = toml.load(fp)
 
 try:
-    os.mkdir(config["server"]["log_dir"])
+    os.mkdir(config.config["server"]["log_dir"])
 except FileExistsError:
     pass
 
@@ -49,7 +48,7 @@ structlog.configure(
 )
 
 root_logger = logging.getLogger()
-_logger = structlog.get_logger()
+logger = structlog.get_logger()
 
 
 tags_metadata = [
@@ -148,21 +147,18 @@ app = FastAPI(
         "email": "Ralf.Kelzenberg@vodafone.com",
     },
 )
-app.mount("/logs", StaticFiles(directory=config["server"]["log_dir"]), name="logs")
+app.mount(
+    "/logs", StaticFiles(directory=config.config["server"]["log_dir"]), name="logs"
+)
 
 
 security = HTTPBasic()
 
-SENTINEL = object()
+
 teams: dict[bytes, bytes] = {
     team["name"].encode("utf8"): team["password"].encode("utf8")
-    for team in config["teams"]
+    for team in config.config["teams"]
 }
-time_to_next_execution: datetime.timedelta
-time_of_next_execution: datetime.datetime
-pre_game_wait: int
-my_game: game.Game
-command_queue: asyncio.Queue[game.Order | object] = asyncio.Queue()
 
 
 def get_current_team(credentials: Annotated[HTTPBasicCredentials, Depends(security)]):
@@ -190,7 +186,7 @@ actor_annotation = Annotated[
         title="Actor",
         description="The actor to act.",
         ge=0,
-        le=len(config["game"]["actors"]) - 1,
+        le=len(config.config["game"]["actors"]) - 1,
     ),
 ]
 
@@ -214,7 +210,7 @@ async def move_order(
 ) -> dict[str, str]:
     """Move an actor into a direction. Moving over your own flag return it to the base."""
     order = game.MoveOrder(team=team, actor=actor, direction=direction)
-    command_queue.put_nowait(order)
+    globals.command_queue.put_nowait(order)
     return {"message": "Move order added."}
 
 
@@ -229,7 +225,7 @@ async def attack_order(
 ) -> dict[str, str]:
     """Only actors with the attack property can attack."""
     order = game.AttackOrder(team=team, actor=actor, direction=direction)
-    command_queue.put_nowait(order)
+    globals.command_queue.put_nowait(order)
     return {"message": "Attack order added."}
 
 
@@ -244,7 +240,7 @@ async def grabput_order(
 ) -> dict[str, str]:
     """If the actor has a flag it puts it, even to another actor that can carry it. If it doesn't have a flag, it grabs it, even from another actor."""
     order = game.GrabPutOrder(team=team, actor=actor, direction=direction)
-    command_queue.put_nowait(order)
+    globals.command_queue.put_nowait(order)
     return {"message": "Grabput order added."}
 
 
@@ -252,7 +248,7 @@ async def grabput_order(
 async def get_game_state() -> StateResponse:
     """Get the current state of the game including locations of all actors, flags, bases and walls."""
     return StateResponse(
-        teams=[team.name for team in my_game.board.teams],
+        teams=[team.name for team in globals.my_game.board.teams],
         actors=[
             ActorDescription(
                 type=actor.__class__.__name__,
@@ -261,32 +257,32 @@ async def get_game_state() -> StateResponse:
                 flag=actor.flag.team.name if actor.flag else None,
                 coordinates=coordinates,
             )
-            for actor, coordinates in my_game.board.actors_coordinates.items()
+            for actor, coordinates in globals.my_game.board.actors_coordinates.items()
         ],
         flags=[
             FlagDescription(team=flag.team.name, coordinates=coordinates)
-            for flag, coordinates in my_game.board.flags_coordinates.items()
+            for flag, coordinates in globals.my_game.board.flags_coordinates.items()
         ],
         bases=[
             BaseDescription(team=base.team.name, coordinates=coordinates)
-            for base, coordinates in my_game.board.bases_coordinates.items()
+            for base, coordinates in globals.my_game.board.bases_coordinates.items()
         ],
-        walls=list(my_game.board.walls_coordinates),
-        scores={team.name: score for team, score in my_game.scores.items()},
-        tick=my_game.tick,
-        time_of_next_execution=time_of_next_execution,
+        walls=list(globals.my_game.board.walls_coordinates),
+        scores={team.name: score for team, score in globals.my_game.scores.items()},
+        tick=globals.my_game.tick,
+        time_of_next_execution=globals.time_of_next_execution,
     )
 
 
 @app.get("/game_rules", tags=["states"])
 async def get_game_rules() -> RulesResponse:
     """Get the current rules and actor properties."""
-    actor_properties = my_game.board.get_actor_properties()
+    actor_properties = globals.my_game.board.get_actor_properties()
     return RulesResponse(
-        map_size=config["game"]["map_size"],
-        max_ticks=config["game"]["max_ticks"],
-        max_score=config["game"]["max_score"],
-        home_flag_required=config["game"]["home_flag_required"],
+        map_size=config.config["game"]["map_size"],
+        max_ticks=config.config["game"]["max_ticks"],
+        max_score=config.config["game"]["max_score"],
+        home_flag_required=config.config["game"]["home_flag_required"],
         actor_properties=actor_properties,
     )
 
@@ -295,22 +291,22 @@ async def get_game_rules() -> RulesResponse:
 async def get_timing() -> TimingResponse:
     """Get the current tick and time of next execution."""
     return TimingResponse(
-        tick=my_game.tick,
-        time_to_next_execution=time_of_next_execution - datetime.datetime.now(),
-        time_of_next_execution=time_of_next_execution,
+        tick=globals.my_game.tick,
+        time_to_next_execution=globals.time_of_next_execution - datetime.datetime.now(),
+        time_of_next_execution=globals.time_of_next_execution,
     )
 
 
 @app.get("/game_start", tags=["states"])
 async def get_game_start() -> int:
     """Return the seconds till the game will start."""
-    return pre_game_wait
+    return config.config["server"]["pre_game_wait"]
 
 
 @app.get("/log_files", tags=["logistics"])
 async def get_log_files() -> list[str]:
     """Get all log files accessible through /logs/[filename]"""
-    return os.listdir(config["server"]["log_dir"])
+    return os.listdir(config.config["server"]["log_dir"])
 
 
 @app.get(
@@ -331,7 +327,7 @@ def get_image() -> Response:
             coordinates=coordinates,
             color=util.color_names[actor.team.number],
         )
-        for actor, coordinates in my_game.board.actors_coordinates.items()
+        for actor, coordinates in globals.my_game.board.actors_coordinates.items()
     ]
     bases = [
         draw.Icon(
@@ -339,7 +335,7 @@ def get_image() -> Response:
             coordinates=coordinates,
             color=util.color_names[base.team.number],
         )
-        for base, coordinates in my_game.board.bases_coordinates.items()
+        for base, coordinates in globals.my_game.board.bases_coordinates.items()
     ]
     walls = [
         draw.Icon(
@@ -347,7 +343,7 @@ def get_image() -> Response:
             coordinates=coordinates,
             color="white",
         )
-        for coordinates in my_game.board.walls_coordinates
+        for coordinates in globals.my_game.board.walls_coordinates
     ]
     flags = [
         draw.Icon(
@@ -355,7 +351,7 @@ def get_image() -> Response:
             coordinates=coordinates,
             color=util.color_names[flag.team.number],
         )
-        for flag, coordinates in my_game.board.flags_coordinates.items()
+        for flag, coordinates in globals.my_game.board.flags_coordinates.items()
     ]
     image = draw.draw_map(actors + bases + walls, flags)
     # media_type here sets the media type of the actual response sent to the client.
@@ -367,100 +363,8 @@ async def read_index():
     return FileResponse("templates/index.html")
 
 
-async def routine():
-    while True:
-        await single_game()
-
-
-async def single_game() -> None:
-    global my_game
-    global pre_game_wait
-    global time_of_next_execution
-    global time_to_next_execution
-    global config
-
-    with open("config.toml", mode="r") as fp:
-        config = toml.load(fp)
-    importlib.reload(game)
-
-    pre_game_wait = config["server"]["pre_game_wait"]
-    for handler in root_logger.handlers:
-        if isinstance(handler, logging.handlers.RotatingFileHandler):
-            handler.doRollover()
-    my_game = game.Game()
-
-    _logger.info("Initiating game.")
-    my_game.initiate_game()
-
-    _logger.info("Starting pre-game.")
-    while pre_game_wait > 0:
-        await asyncio.sleep(1)
-        pre_game_wait -= 1
-
-    while not my_game.check_game_end():
-        await command_queue.put(SENTINEL)
-
-        commands = await get_all_queue_items(command_queue)
-
-        bind_contextvars(tick=my_game.tick)
-        os.system("cls" if os.name == "nt" else "clear")
-
-        print(my_game.scoreboard())
-        print(my_game.board.image())
-
-        _logger.info("Starting tick execution.")
-        my_game.execute_game_step(commands)
-
-        _logger.info("Waiting for game commands.")
-        time_of_next_execution = datetime.datetime.now() + datetime.timedelta(
-            0, config["server"]["tick_wait_time"]
-        )
-        _logger.info(f"Time of next execution: {time_of_next_execution}")
-
-        await asyncio.sleep(config["server"]["tick_wait_time"])
-    my_game.end_game()
-    os.system("cls" if os.name == "nt" else "clear")
-    print(my_game.scoreboard())
-    print(my_game.board.image())
-
-
-async def get_all_queue_items(
-    queue: asyncio.Queue[game.Order | object],
-) -> list[game.Order]:
-    items: list[game.Order] = []
-    item = await queue.get()
-    while item is not SENTINEL:
-        items.append(item)  # type: ignore
-        queue.task_done()
-        item = await queue.get()
-    queue.task_done()
-    return items
-
-
-async def ai_generator():
-    import board_computations
-
-    await asyncio.sleep(1)
-    while True:
-        await asyncio.sleep(5)
-        await command_queue.put(
-            game.MoveOrder(
-                team="Team 1",
-                actor=0,
-                direction=board_computations.Directions.down,
-            )
-        )
-        await asyncio.sleep(5)
-        await command_queue.put(
-            game.MoveOrder(
-                team="Team 2",
-                actor=0,
-                direction=board_computations.Directions.right,
-            )
-        )
-
-
 @app.on_event("startup")
 async def startup():
-    asyncio.create_task(routine())
-    asyncio.create_task(ai_generator())
+    pass
+    asyncio.create_task(game_loop.routine())
+    asyncio.create_task(game_loop.ai_generator())
