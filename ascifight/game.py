@@ -1,21 +1,15 @@
-import os
-
-from pydantic import BaseModel, ValidationError, Field
+from pydantic import BaseModel, Field
 from typing import TypeVar
 import structlog
 from structlog.contextvars import bind_contextvars, unbind_contextvars
-import toml
 
 
+import ascifight.config as config
 import ascifight.util as util
-import ascifight.board_data as board_data
-import ascifight.board_setup as board_setup
-import ascifight.board_actions as board_actions
-import ascifight.board_computations as board_computations
-
-absolute_path = os.path.dirname(__file__)
-with open(f"{absolute_path}/config.toml", mode="r") as fp:
-    config = toml.load(fp)
+import ascifight.board.data as data
+import ascifight.board.setup as setup
+import ascifight.board.actions as actions
+import ascifight.board.computations as computations
 
 
 T = TypeVar("T")
@@ -32,9 +26,9 @@ class AttackOrder(Order):
     actor: int = Field(
         description="The id of the actor, specific to the team.",
         ge=0,
-        le=len(config["game"]["actors"]) - 1,
+        le=len(config.config["game"]["actors"]) - 1,
     )
-    direction: board_computations.Directions = Field(
+    direction: computations.Directions = Field(
         title="Direction",
         description="The direction to attack from the position of the actor.",
     )
@@ -47,9 +41,9 @@ class MoveOrder(Order):
     actor: int = Field(
         description="The id of the actor, specific to the team.",
         ge=0,
-        le=len(config["game"]["actors"]) - 1,
+        le=len(config.config["game"]["actors"]) - 1,
     )
-    direction: board_computations.Directions = Field(
+    direction: computations.Directions = Field(
         title="Direction",
         description="The direction to move to from the position of the actor. 'up' increases the y coordinate and 'right' increases the x coordinate.",
     )
@@ -63,9 +57,9 @@ class GrabPutOrder(Order):
         title="Actor",
         description="The id of the actor, specific to the team.",
         ge=0,
-        le=len(config["game"]["actors"]) - 1,
+        le=len(config.config["game"]["actors"]) - 1,
     )
-    direction: board_computations.Directions = Field(
+    direction: computations.Directions = Field(
         title="Direction",
         description=(
             "The direction to grab of put the flag from the position of the actor. "
@@ -79,31 +73,31 @@ class GrabPutOrder(Order):
 class Game:
     def __init__(
         self,
-        game_board: board_data.BoardData = board_data.BoardData(),
-        score_file=config["server"]["scores_file"],
-        score_multiplier: int = config["game"]["score_multiplier"],
-        max_ticks: int = config["game"]["max_ticks"],
-        max_score: int = config["game"]["max_score"],
+        game_board: data.BoardData = data.BoardData(),
+        score_file=config.config["server"]["scores_file"],
+        score_multiplier: int = config.config["game"]["score_multiplier"],
+        max_ticks: int = config.config["game"]["max_ticks"],
+        max_score: int = config.config["game"]["max_score"],
     ) -> None:
         self.logger = structlog.get_logger()
         self.score_file = score_file
         self.score_multiplier = score_multiplier
 
         self.board = game_board
-        self.board_actions = board_actions.BoardActions(self.board)
-        self.scores: dict[board_data.Team, int] = {}
-        self.overall_score: dict[board_data.Team, int] = {}
+        self.board_actions = actions.BoardActions(self.board)
+        self.scores: dict[data.Team, int] = {}
+        self.overall_score: dict[data.Team, int] = {}
         self.tick = 0
         self.max_ticks = max_ticks
         self.max_score = max_score
 
     def initiate_game(self) -> None:
-        game_board_setup = board_setup.BoardSetup(
+        game_board_setup = setup.BoardSetup(
             game_board_data=self.board,
-            teams=config["teams"],
-            actors=config["game"]["actors"],
-            map_size=config["game"]["map_size"],
-            walls=config["game"]["walls"],
+            teams=config.config["teams"],
+            actors=config.config["game"]["actors"],
+            map_size=config.config["game"]["map_size"],
+            walls=config.config["game"]["walls"],
         )
         game_board_setup.initialize_map()
         self._set_scores()
@@ -186,7 +180,7 @@ class Game:
         except FileNotFoundError:
             pass
 
-    def _actor_dict(self, value: T) -> dict[board_data.Actor, T]:
+    def _actor_dict(self, value: T) -> dict[data.Actor, T]:
         value_dict = {}
         for actor in self.board.teams_actors.values():
             value_dict[actor] = value

@@ -80,7 +80,7 @@ async def get_all_queue_items(
 
 
 async def ai_generator():
-    import board_computations
+    import ascifight.board.computations
 
     await asyncio.sleep(1)
     while True:
@@ -89,7 +89,7 @@ async def ai_generator():
             game.MoveOrder(
                 team="Team 1",
                 actor=0,
-                direction=board_computations.Directions.down,
+                direction=ascifight.board.computations.Directions.down,
             )
         )
         await asyncio.sleep(5)
@@ -97,6 +97,6 @@ async def ai_generator():
             game.MoveOrder(
                 team="Team 2",
                 actor=0,
-                direction=board_computations.Directions.right,
+                direction=ascifight.board.computations.Directions.right,
             )
         )

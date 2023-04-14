@@ -6,7 +6,7 @@ import random
 import enum
 import math
 
-import ascifight.board_data as board_data
+import ascifight.board.data as data
 
 
 class Directions(str, enum.Enum):
@@ -17,11 +17,11 @@ class Directions(str, enum.Enum):
 
 
 def calc_target_coordinates(
-    coordinates: board_data.Coordinates,
+    coordinates: data.Coordinates,
     direction: Directions,
     map_size: int,
-) -> board_data.Coordinates:
-    new_coordinates = board_data.Coordinates(x=coordinates.x, y=coordinates.y)
+) -> data.Coordinates:
+    new_coordinates = data.Coordinates(x=coordinates.x, y=coordinates.y)
     match direction:
         case direction.right:
             new_coordinates.x = min(coordinates.x + 1, map_size - 1)
@@ -35,8 +35,8 @@ def calc_target_coordinates(
 
 
 def calc_target_coordinate_direction(
-    origin: board_data.Coordinates,
-    target: board_data.Coordinates,
+    origin: data.Coordinates,
+    target: data.Coordinates,
 ) -> list[Directions]:
     direction = [Directions.up]
 
@@ -73,16 +73,16 @@ def calc_target_coordinate_direction(
 
 
 def distance(
-    origin: board_data.Coordinates,
-    target: board_data.Coordinates,
+    origin: data.Coordinates,
+    target: data.Coordinates,
 ) -> int:
     x, y = distance_vector(origin, target)
     return abs(x) + abs(y)
 
 
 def distance_vector(
-    origin: board_data.Coordinates,
-    target: board_data.Coordinates,
+    origin: data.Coordinates,
+    target: data.Coordinates,
 ) -> tuple[int, int]:
     x = target.x - origin.x
     y = target.y - origin.y

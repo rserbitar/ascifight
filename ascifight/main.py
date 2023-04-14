@@ -18,8 +18,8 @@ import toml
 import ascifight.config as config
 import ascifight.globals as globals
 import ascifight.game as game
-import ascifight.board_data as board_data
-import ascifight.board_computations as board_computations
+import ascifight.board.data as data
+import ascifight.board.computations as computations
 import ascifight.draw as draw
 import ascifight.util as util
 import ascifight.game_loop as game_loop
@@ -74,21 +74,21 @@ class ActorDescription(BaseModel):
     flag: str | None = Field(
         description="If and which teams flag the actor is carrying."
     )
-    coordinates: board_data.Coordinates = Field(
+    coordinates: data.Coordinates = Field(
         description="The current coordinates fo the actor."
     )
 
 
 class FlagDescription(BaseModel):
     team: str = Field(description="The name of the flags's team.")
-    coordinates: board_data.Coordinates = Field(
+    coordinates: data.Coordinates = Field(
         description="The current coordinates fo the flag."
     )
 
 
 class BaseDescription(BaseModel):
     team: str = Field(description="The name of the base's team.")
-    coordinates: board_data.Coordinates = Field(
+    coordinates: data.Coordinates = Field(
         description="The current coordinates fo the base."
     )
 
@@ -100,7 +100,7 @@ class StateResponse(BaseModel):
     )
     flags: list[FlagDescription] = Field(description="A list of all flags in the game.")
     bases: list[BaseDescription] = Field(description="A list of all bases in the game.")
-    walls: list[board_data.Coordinates] = Field(
+    walls: list[data.Coordinates] = Field(
         description="A list of all walls in the game. Actors can not enter wall fields."
     )
     scores: dict[str, int] = Field(description="A dictionary of the current scores.")
@@ -133,7 +133,7 @@ class RulesResponse(BaseModel):
     home_flag_required: bool = Field(
         description="Is the flag required to be at home to score?",
     )
-    actor_properties: list[board_data.ActorProperty]
+    actor_properties: list[data.ActorProperty]
 
 
 app = FastAPI(
@@ -191,7 +191,7 @@ actor_annotation = Annotated[
 ]
 
 direction_annotation = Annotated[
-    board_computations.Directions,
+    computations.Directions,
     Query(
         title="Direction",
         description="The direction the actor should perform the action to.",

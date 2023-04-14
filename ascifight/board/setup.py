@@ -5,13 +5,13 @@ import structlog
 import random
 import itertools
 
-import ascifight.board_data as board_data
+import ascifight.board.data as data
 
 
 class BoardSetup:
     def __init__(
         self,
-        game_board_data: board_data.BoardData,
+        game_board_data: data.BoardData,
         teams: list[dict[str, str]],
         actors: list[str],
         map_size: int,
@@ -23,14 +23,14 @@ class BoardSetup:
         self.board_data = game_board_data
         self.walls = walls
 
-        self.names_teams: dict[str, board_data.Team] = {
-            team["name"]: board_data.Team(
+        self.names_teams: dict[str, data.Team] = {
+            team["name"]: data.Team(
                 name=team["name"], password=team["password"], number=i
             )
             for i, team in enumerate(teams)
         }
-        self.teams: list[board_data.Team] = list(self.board_data.names_teams.values())
-        self.actor_classes: list[type[board_data.Actor]] = [
+        self.teams: list[data.Team] = list(self.board_data.names_teams.values())
+        self.actor_classes: list[type[data.Actor]] = [
             self.board_data._get_actor(actor) for actor in actors
         ]
 
@@ -60,7 +60,7 @@ class BoardSetup:
                 self.board_data.teams_actors[(team, number)] = actor_class(
                     ident=number, team=team
                 )
-            coordinates = self.board_data.bases_coordinates[board_data.Base(team=team)]
+            coordinates = self.board_data.bases_coordinates[data.Base(team=team)]
             actors = [
                 self.board_data.teams_actors[(team, a)]
                 for a in range(len(self.actor_classes))
@@ -75,26 +75,24 @@ class BoardSetup:
             available_places.remove(place_chosen)
             x = random.randint(*self._base_place_matrix[place_chosen][0])
             y = random.randint(*self._base_place_matrix[place_chosen][1])
-            coordinates = board_data.Coordinates(x=x, y=y)
-            self.board_data.bases_coordinates[board_data.Base(team=team)] = coordinates
-            self.board_data.flags_coordinates[board_data.Flag(team=team)] = coordinates
+            coordinates = data.Coordinates(x=x, y=y)
+            self.board_data.bases_coordinates[data.Base(team=team)] = coordinates
+            self.board_data.flags_coordinates[data.Flag(team=team)] = coordinates
 
     def _get_area_positions(
-        self, center: board_data.Coordinates, distance: int
-    ) -> list[board_data.Coordinates]:
-        positions: list[board_data.Coordinates] = []
+        self, center: data.Coordinates, distance: int
+    ) -> list[data.Coordinates]:
+        positions: list[data.Coordinates] = []
         for x in range(center.x - distance, center.x + distance):
             for y in range(center.y - distance, center.y + distance):
                 try:
-                    positions.append(board_data.Coordinates(x=x, y=y))
+                    positions.append(data.Coordinates(x=x, y=y))
                     # ignore forbidden space out of bounds
                 except ValidationError:
                     pass
         return positions
 
-    def _place_actors(
-        self, actors: list[board_data.Actor], base: board_data.Coordinates
-    ) -> None:
+    def _place_actors(self, actors: list[data.Actor], base: data.Coordinates) -> None:
         starting_places = self._get_area_positions(base, 2)
         starting_places.remove(base)
         random.shuffle(starting_places)
@@ -109,9 +107,7 @@ class BoardSetup:
         all_combinations = itertools.product(
             *[range(self.map_size), range(self.map_size)]
         )
-        all_positions = {
-            board_data.Coordinates(x=i[0], y=i[1]) for i in all_combinations
-        }
+        all_positions = {data.Coordinates(x=i[0], y=i[1]) for i in all_combinations}
         possible_coordinates = list(all_positions - forbidden_positions)
         random.shuffle(possible_coordinates)
         self.walls_coordinates = set(possible_coordinates[: self.walls])

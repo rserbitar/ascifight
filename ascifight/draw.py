@@ -6,7 +6,7 @@ from PIL import Image, ImageDraw, ImageFont
 import toml
 
 import ascifight.config as config
-import ascifight.board_data as board_data
+import ascifight.board.data as data
 import ascifight.util as util
 
 
@@ -16,7 +16,7 @@ map_size: int = config.config["game"]["map_size"]
 
 class Icon(pydantic.BaseModel):
     name: str
-    coordinates: board_data.Coordinates
+    coordinates: data.Coordinates
     color: str
 
 
@@ -89,16 +89,14 @@ def draw_map(
 
 if __name__ == "__main__":
     icons = [
-        Icon(name="R1", coordinates=board_data.Coordinates(x=14, y=14), color="yellow"),
-        Icon(name="R1", coordinates=board_data.Coordinates(x=0, y=4), color="blue"),
-        Icon(name="R1", coordinates=board_data.Coordinates(x=2, y=14), color="green"),
-        Icon(name="R1", coordinates=board_data.Coordinates(x=0, y=0), color="yellow"),
+        Icon(name="R1", coordinates=data.Coordinates(x=14, y=14), color="yellow"),
+        Icon(name="R1", coordinates=data.Coordinates(x=0, y=4), color="blue"),
+        Icon(name="R1", coordinates=data.Coordinates(x=2, y=14), color="green"),
+        Icon(name="R1", coordinates=data.Coordinates(x=0, y=0), color="yellow"),
     ]
 
     annotations = [
-        Icon(
-            name="\u25B2", coordinates=board_data.Coordinates(x=2, y=4), color="yellow"
-        ),
+        Icon(name="\u25B2", coordinates=data.Coordinates(x=2, y=4), color="yellow"),
     ]
 
     draw_map(icons, annotations)

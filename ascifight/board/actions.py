@@ -3,17 +3,16 @@ import toml
 import structlog
 
 import random
-import enum
-import math
 
-import ascifight.board_data as board_data
-import ascifight.board_computations as board_computations
+
+import ascifight.board.data as data
+import ascifight.board.computations as computations
 
 
 class BoardActions:
     def __init__(
         self,
-        game_board_data: board_data.BoardData,
+        game_board_data: data.BoardData,
     ):
         self._logger = structlog.get_logger()
         self.board_data = game_board_data
@@ -22,40 +21,40 @@ class BoardActions:
 
     def calc_target_coordinates(
         self,
-        origin: board_data.Actor | board_data.Coordinates,
-        direction: board_computations.Directions,
-    ) -> board_data.Coordinates:
+        origin: data.Actor | data.Coordinates,
+        direction: computations.Directions,
+    ) -> data.Coordinates:
         coordinates = (
             origin
-            if isinstance(origin, board_data.Coordinates)
+            if isinstance(origin, data.Coordinates)
             else self.board_data.actors_coordinates[origin]
         )
-        return board_computations.calc_target_coordinates(
+        return computations.calc_target_coordinates(
             coordinates, direction, self.board_data.map_size
         )
 
     def calc_target_direction(
         self,
-        origin: board_data.BoardObject | board_data.Coordinates,
-        target: board_data.BoardObject | board_data.Coordinates,
-    ) -> list[board_computations.Directions]:
+        origin: data.BoardObject | data.Coordinates,
+        target: data.BoardObject | data.Coordinates,
+    ) -> list[computations.Directions]:
         origin_coordinates = (
             origin
-            if isinstance(origin, board_data.Coordinates)
+            if isinstance(origin, data.Coordinates)
             else self.board_data.board_objects_coordinates(origin)
         )
         target_coordinates = (
             target
-            if isinstance(target, board_data.Coordinates)
+            if isinstance(target, data.Coordinates)
             else self.board_data.board_objects_coordinates(target)
         )
-        return board_computations.calc_target_coordinate_direction(
+        return computations.calc_target_coordinate_direction(
             origin=origin_coordinates, target=target_coordinates
         )
 
     def move(
-        self, actor: board_data.Actor, direction: board_computations.Directions
-    ) -> tuple[bool, None | board_data.Team]:
+        self, actor: data.Actor, direction: computations.Directions
+    ) -> tuple[bool, None | data.Team]:
         team_that_scored = None
         new_coordinates = self.calc_target_coordinates(actor, direction)
         moved = self._try_put_actor(actor, new_coordinates)
@@ -63,9 +62,7 @@ class BoardActions:
             team_that_scored = self._check_flag_return_conditions(actor)
         return moved, team_that_scored
 
-    def attack(
-        self, actor: board_data.Actor, direction: board_computations.Directions
-    ) -> bool:
+    def attack(self, actor: data.Actor, direction: computations.Directions) -> bool:
         attacked = False
         if not actor.attack:
             self._logger.warning(f"{actor} can not attack.")
@@ -87,15 +84,15 @@ class BoardActions:
         return attacked
 
     def grabput_flag(
-        self, actor: board_data.Actor, direction: board_computations.Directions
-    ) -> tuple[bool, None | board_data.Team]:
+        self, actor: data.Actor, direction: computations.Directions
+    ) -> tuple[bool, None | data.Team]:
         team_that_scored = None
         target_coordinates = self.calc_target_coordinates(actor, direction)
 
         grab_successful = random.random() < actor.grab
         target_actor = self.board_data.coordinates_actors.get(target_coordinates)
         already_grabbed = False
-        flag: board_data.Flag | None
+        flag: data.Flag | None
 
         if actor.flag is not None:
             flag = actor.flag
@@ -162,8 +159,8 @@ class BoardActions:
         return already_grabbed, team_that_scored
 
     def _check_score_conditions(
-        self, flag_to_score: board_data.Flag | None = None
-    ) -> board_data.Team | None:
+        self, flag_to_score: data.Flag | None = None
+    ) -> data.Team | None:
         team_that_scored = None
         flags = (
             [flag_to_score]
@@ -185,12 +182,8 @@ class BoardActions:
                 scoring_team = base_at_flag_coordinates.team
                 # own flag is at base or this is not required
                 if (
-                    self.board_data.flags_coordinates[
-                        board_data.Flag(team=scoring_team)
-                    ]
-                    == self.board_data.bases_coordinates[
-                        board_data.Base(team=scoring_team)
-                    ]
+                    self.board_data.flags_coordinates[data.Flag(team=scoring_team)]
+                    == self.board_data.bases_coordinates[data.Base(team=scoring_team)]
                 ) or (not self.config["game"]["home_flag_required"]):
                     self._logger.info(
                         f"{scoring_team} scored {flag_to_score.team} flag!"
@@ -202,15 +195,13 @@ class BoardActions:
                     self._logger.warning("Can not score, flag not at home.")
         return team_that_scored
 
-    def _respawn(self, actor: board_data.Actor) -> None:
-        base_coordinates = self.board_data.bases_coordinates[
-            board_data.Base(team=actor.team)
-        ]
+    def _respawn(self, actor: data.Actor) -> None:
+        base_coordinates = self.board_data.bases_coordinates[data.Base(team=actor.team)]
         possible_spawn_points = []
         for x in range(base_coordinates.x - 2, base_coordinates.x + 3):
             for y in range(base_coordinates.y - 2, base_coordinates.y + 3):
                 try:
-                    possible_spawn_points.append(board_data.Coordinates(x=x, y=y))
+                    possible_spawn_points.append(data.Coordinates(x=x, y=y))
                 # ignore impossible positions
                 except ValidationError:
                     pass
@@ -223,14 +214,12 @@ class BoardActions:
         )
         self._place_actor_in_area(actor, possible_spawn_points, forbidden_positions)
 
-    def _return_flag_to_base(self, flag: board_data.Flag) -> None:
+    def _return_flag_to_base(self, flag: data.Flag) -> None:
         self.board_data.flags_coordinates[flag] = self.board_data.bases_coordinates[
-            board_data.Base(team=flag.team)
+            data.Base(team=flag.team)
         ]
 
-    def _check_flag_return_conditions(
-        self, actor: board_data.Actor
-    ) -> board_data.Team | None:
+    def _check_flag_return_conditions(self, actor: data.Actor) -> data.Team | None:
         team_that_scored = None
         coordinates = self.board_data.actors_coordinates[actor]
         if coordinates in self.board_data.flags_coordinates.values():
@@ -245,9 +234,9 @@ class BoardActions:
 
     def _place_actor_in_area(
         self,
-        actor: board_data.Actor,
-        possible_spawn_points: list[board_data.Coordinates],
-        forbidden_positions: set[board_data.Coordinates],
+        actor: data.Actor,
+        possible_spawn_points: list[data.Coordinates],
+        forbidden_positions: set[data.Coordinates],
     ) -> None:
         allowed_positions = set(possible_spawn_points) - set(forbidden_positions)
         target_coordinates = random.choice(list(allowed_positions))
@@ -258,20 +247,20 @@ class BoardActions:
         self._logger.info(f"{actor} respawned to coordinates {target_coordinates}.")
 
     def _get_area_positions(
-        self, center: board_data.Coordinates, distance: int
-    ) -> list[board_data.Coordinates]:
-        positions: list[board_data.Coordinates] = []
+        self, center: data.Coordinates, distance: int
+    ) -> list[data.Coordinates]:
+        positions: list[data.Coordinates] = []
         for x in range(center.x - distance, center.x + distance):
             for y in range(center.y - distance, center.y + distance):
                 try:
-                    positions.append(board_data.Coordinates(x=x, y=y))
+                    positions.append(data.Coordinates(x=x, y=y))
                     # ignore forbidden space out of bounds
                 except ValidationError:
                     pass
         return positions
 
     def _try_put_actor(
-        self, actor: board_data.Actor, new_coordinates: board_data.Coordinates
+        self, actor: data.Actor, new_coordinates: data.Coordinates
     ) -> bool:
         coordinates = self.board_data.actors_coordinates[actor]
         moved = False
