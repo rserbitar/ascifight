@@ -1,40 +1,40 @@
 import pytest
-import ascifight.board_computations as board_computations
-import ascifight.board_data as board_data
+import ascifight.board.computations as computations
+import ascifight.board.data as data
 
 
 @pytest.mark.parametrize(
     "coordinates, direction, map_size, result",
     [
         (
-            board_data.Coordinates(x=10, y=10),
-            board_computations.Directions.up,
+            data.Coordinates(x=10, y=10),
+            computations.Directions.up,
             15,
-            board_data.Coordinates(x=10, y=11),
+            data.Coordinates(x=10, y=11),
         ),
         (
-            board_data.Coordinates(x=4, y=0),
-            board_computations.Directions.down,
+            data.Coordinates(x=4, y=0),
+            computations.Directions.down,
             15,
-            board_data.Coordinates(x=4, y=0),
+            data.Coordinates(x=4, y=0),
         ),
         (
-            board_data.Coordinates(x=10, y=10),
-            board_computations.Directions.left,
+            data.Coordinates(x=10, y=10),
+            computations.Directions.left,
             15,
-            board_data.Coordinates(x=9, y=10),
+            data.Coordinates(x=9, y=10),
         ),
         (
-            board_data.Coordinates(x=14, y=10),
-            board_computations.Directions.right,
+            data.Coordinates(x=14, y=10),
+            computations.Directions.right,
             15,
-            board_data.Coordinates(x=14, y=10),
+            data.Coordinates(x=14, y=10),
         ),
     ],
 )
 def test_calc_target_coordinates(coordinates, direction, map_size, result):
     assert (
-        board_computations.calc_target_coordinates(
+        computations.calc_target_coordinates(
             coordinates=coordinates,
             direction=direction,
             map_size=map_size,
@@ -47,37 +47,35 @@ def test_calc_target_coordinates(coordinates, direction, map_size, result):
     "origin, target, result",
     [
         (
-            board_data.Coordinates(x=10, y=10),
-            board_data.Coordinates(x=10, y=11),
-            [board_computations.Directions.up],
+            data.Coordinates(x=10, y=10),
+            data.Coordinates(x=10, y=11),
+            [computations.Directions.up],
         ),
         (
-            board_data.Coordinates(x=4, y=1),
-            board_data.Coordinates(x=4, y=0),
-            [board_computations.Directions.down],
+            data.Coordinates(x=4, y=1),
+            data.Coordinates(x=4, y=0),
+            [computations.Directions.down],
         ),
         (
-            board_data.Coordinates(x=5, y=1),
-            board_data.Coordinates(x=4, y=1),
-            [board_computations.Directions.left],
+            data.Coordinates(x=5, y=1),
+            data.Coordinates(x=4, y=1),
+            [computations.Directions.left],
         ),
         (
-            board_data.Coordinates(x=4, y=1),
-            board_data.Coordinates(x=5, y=1),
-            [board_computations.Directions.right],
+            data.Coordinates(x=4, y=1),
+            data.Coordinates(x=5, y=1),
+            [computations.Directions.right],
         ),
         (
-            board_data.Coordinates(x=4, y=1),
-            board_data.Coordinates(x=5, y=2),
-            [board_computations.Directions.right, board_computations.Directions.up],
+            data.Coordinates(x=4, y=1),
+            data.Coordinates(x=5, y=2),
+            [computations.Directions.right, computations.Directions.up],
         ),
     ],
 )
 def test_calc_target_coordinate_direction(origin, target, result):
     assert set(
-        board_computations.calc_target_coordinate_direction(
-            origin=origin, target=target
-        )
+        computations.calc_target_coordinate_direction(origin=origin, target=target)
     ) == set(result)
 
 
@@ -85,21 +83,21 @@ def test_calc_target_coordinate_direction(origin, target, result):
     "origin, target, result",
     [
         (
-            board_data.Coordinates(x=10, y=10),
-            board_data.Coordinates(x=4, y=10),
+            data.Coordinates(x=10, y=10),
+            data.Coordinates(x=4, y=10),
             6,
         ),
         (
-            board_data.Coordinates(x=4, y=4),
-            board_data.Coordinates(x=4, y=0),
+            data.Coordinates(x=4, y=4),
+            data.Coordinates(x=4, y=0),
             4,
         ),
         (
-            board_data.Coordinates(x=10, y=6),
-            board_data.Coordinates(x=2, y=9),
+            data.Coordinates(x=10, y=6),
+            data.Coordinates(x=2, y=9),
             11,
         ),
     ],
 )
 def test_distance(origin, target, result):
-    assert board_computations.distance(origin=origin, target=target) == result
+    assert computations.distance(origin=origin, target=target) == result
