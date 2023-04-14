@@ -3,8 +3,11 @@ import logging, logging.config, logging.handlers
 import asyncio
 import os
 import importlib
+import secrets
+from typing import Annotated
 
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Response, Depends, HTTPException, status, Query, Path
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 
@@ -15,6 +18,7 @@ import toml
 
 import ascifight.game as game
 import ascifight.board_data as board_data
+import ascifight.board_computations as board_computations
 import ascifight.draw as draw
 import ascifight.util as util
 
@@ -140,7 +144,14 @@ app = FastAPI(
 )
 app.mount("/logs", StaticFiles(directory=config["server"]["log_dir"]), name="logs")
 
+
+security = HTTPBasic()
+
 SENTINEL = object()
+teams: dict[bytes, bytes] = {
+    team["name"].encode("utf8"): team["password"].encode("utf8")
+    for team in config["teams"]
+}
 time_to_next_execution: datetime.timedelta
 time_of_next_execution: datetime.datetime
 pre_game_wait: int
@@ -148,23 +159,85 @@ my_game: game.Game
 command_queue: asyncio.Queue[game.Order | object] = asyncio.Queue()
 
 
-@app.post("/move_order", tags=["orders"])
-async def move_order(order: game.MoveOrder) -> dict[str, str]:
+def get_current_team(credentials: Annotated[HTTPBasicCredentials, Depends(security)]):
+    current_username_bytes = credentials.username.encode("utf8")
+
+    current_password_bytes = credentials.password.encode("utf8")
+    correct_password_bytes = b""
+    if current_username_bytes in teams.keys():
+        correct_password_bytes = teams[current_username_bytes]
+    is_correct_password = secrets.compare_digest(
+        current_password_bytes, correct_password_bytes
+    )
+    if not is_correct_password:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
+
+
+actor_annotation = Annotated[
+    int,
+    Path(
+        title="Actor",
+        description="The actor to act.",
+        ge=0,
+        le=len(config["game"]["actors"]) - 1,
+    ),
+]
+
+direction_annotation = Annotated[
+    board_computations.Directions,
+    Query(
+        title="Direction",
+        description="The direction the actor should perform the action to.",
+    ),
+]
+
+
+@app.post(
+    "/move_order/{actor}",
+    tags=["orders"],
+)
+async def move_order(
+    team: Annotated[str, Depends(get_current_team)],
+    actor: actor_annotation,
+    direction: direction_annotation,
+) -> dict[str, str]:
     """Move an actor into a direction. Moving over your own flag return it to the base."""
+    order = game.MoveOrder(team=team, actor=actor, direction=direction)
     command_queue.put_nowait(order)
     return {"message": "Move order added."}
 
 
-@app.post("/attack_order", tags=["orders"])
-async def attack_order(order: game.AttackOrder) -> dict[str, str]:
+@app.post(
+    "/attack_order/{actor}",
+    tags=["orders"],
+)
+async def attack_order(
+    team: Annotated[str, Depends(get_current_team)],
+    actor: actor_annotation,
+    direction: direction_annotation,
+) -> dict[str, str]:
     """Only actors with the attack property can attack."""
+    order = game.AttackOrder(team=team, actor=actor, direction=direction)
     command_queue.put_nowait(order)
     return {"message": "Attack order added."}
 
 
-@app.post("/grabput_order", tags=["orders"])
-async def grabput_order(order: game.GrabPutOrder) -> dict[str, str]:
+@app.post(
+    "/grabput_order/{actor}",
+    tags=["orders"],
+)
+async def grabput_order(
+    team: Annotated[str, Depends(get_current_team)],
+    actor: actor_annotation,
+    direction: direction_annotation,
+) -> dict[str, str]:
     """If the actor has a flag it puts it, even to another actor that can carry it. If it doesn't have a flag, it grabs it, even from another actor."""
+    order = game.GrabPutOrder(team=team, actor=actor, direction=direction)
     command_queue.put_nowait(order)
     return {"message": "Grabput order added."}
 
@@ -361,7 +434,6 @@ async def ai_generator():
         await command_queue.put(
             game.MoveOrder(
                 team="Team 1",
-                password="1",
                 actor=0,
                 direction=board_computations.Directions.down,
             )
@@ -370,7 +442,6 @@ async def ai_generator():
         await command_queue.put(
             game.MoveOrder(
                 team="Team 2",
-                password="2",
                 actor=0,
                 direction=board_computations.Directions.right,
             )

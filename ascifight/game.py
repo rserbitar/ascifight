@@ -23,9 +23,6 @@ T = TypeVar("T")
 
 class Order(BaseModel):
     team: str = Field(description="Name of the team to issue the order.")
-    password: str = Field(
-        description="The password for the team used during registering."
-    )
 
     def __str__(self):
         return f"Order by {self.team}"
@@ -123,13 +120,12 @@ class Game:
         grabput_orders: list[GrabPutOrder] = []
 
         for order in orders:
-            if self._validate_order(order):
-                if isinstance(order, MoveOrder):
-                    move_orders.append(order)
-                elif isinstance(order, AttackOrder):
-                    attack_orders.append(order)
-                elif isinstance(order, GrabPutOrder):
-                    grabput_orders.append(order)
+            if isinstance(order, MoveOrder):
+                move_orders.append(order)
+            elif isinstance(order, AttackOrder):
+                attack_orders.append(order)
+            elif isinstance(order, GrabPutOrder):
+                grabput_orders.append(order)
 
         self.logger.info("Executing move orders.")
         self._execute_move_orders(move_orders)
@@ -195,16 +191,6 @@ class Game:
         for actor in self.board.teams_actors.values():
             value_dict[actor] = value
         return value_dict
-
-    def _validate_order(self, order: Order) -> bool:
-        check = False
-        if order.team in self.board.names_teams.keys():
-            check = self.board.names_teams[order.team].password == order.password
-            if not check:
-                self.logger.warning(f"{order} was ignored. Wrong password.")
-        else:
-            self.logger.warning(f"{order} was ignored. Team unknown.")
-        return check
 
     def _execute_move_orders(self, move_orders: list[MoveOrder]) -> None:
         already_moved = self._actor_dict(False)
