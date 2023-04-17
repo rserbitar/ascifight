@@ -1,79 +1,90 @@
-import math
-import dataclasses
 import httpx
-# hack if you want to use requests instead of httpx:
-# import requests
-# httpx = requests
-import random
+
+
+import enum
 import structlog
 import structlog.contextvars
 import time
 
 logger = structlog.get_logger()
 
-server = 'http://127.0.0.1:8000/'
+SERVER = "http://127.0.0.1:8000/"
 TEAM = ""
 PASSWORD = ""
 
-@dataclasses.dataclass
-class Order:
-    order_type: str
-    actor: int
-    direction: str
-    team: str = TEAM
-    password: str = PASSWORD
+
+class Orders(str, enum.Enum):
+    move = "move_order"
+    attack = "attack_order"
+    grabput = "grabput_order"
 
 
-def place_order(order: Order):
-    order_dict = dataclasses.asdict(order)
-    order_type = order_dict.pop('order_type')
-    url = server + f'{order_type}_order'
-    httpx.post(url=url, json=order_dict)
+class Directions(str, enum.Enum):
+    left = "left"
+    right = "right"
+    down = "down"
+    up = "up"
+
+
+def execute():
+    # put your execution code here
+    state = get_information("game_state")
+    # place_order(Orders.move, 0, Directions.left)
+
+
+def place_order(order: Orders, actor: int, direction: Directions) -> httpx.Response:
+    url: str = SERVER + order + f"{actor}"
+    return httpx.post(url=url, params={"direction": direction}, auth=(TEAM, PASSWORD))
 
 
 def get_information(info_type: str):
-    url = server + info_type
+    url = SERVER + info_type
     response = httpx.get(url)
     return response.json()
 
 
-def get_new_orders():
-    pass
-
-if __name__ == '__main__':
+def game_loop():
     current_tick = -1
     game_started = False
-
     while True:
         if not game_started:
-            time_to_start = get_information('game_start')
-            if time_to_start > 0:
-                logger.info('waiting until game start', seconds=time_to_start)
-                time.sleep(time_to_start)
-            else:
-                logger.info('game has started')
-                game_started = True
+            try:
+                time_to_start = get_information("game_start")
+                if time_to_start > 0:
+                    logger.info("waiting until game starts.", seconds=time_to_start)
+                    time.sleep(time_to_start)
+                else:
+                    logger.info("Game has started.")
+                    game_started = True
+            except httpx.ConnectError:
+                logger.info("Server not started. Sleeping 10 seconds.")
+                time.sleep(10)
+                continue
         else:
-
-            timing = get_information('timing')
-            if timing['tick'] > current_tick:
-                structlog.contextvars.bind_contextvars(tick=timing['tick'])
-                orders = get_new_orders()
-                for order in orders:
-                    place_order(order)
-                current_tick = timing['tick']
-                logger.info('Placed orders')
-            elif timing['tick'] < current_tick:
-                time_to_start = get_information('game_start')
+            timing = get_information("timing")
+            if timing["tick"] > current_tick:
+                structlog.contextvars.bind_contextvars(tick=timing["tick"])
+                execute()
+                current_tick = timing["tick"]
+                logger.info("Executed tick.")
+            elif timing["tick"] < current_tick:
+                time_to_start = get_information("game_start")
                 if time_to_start > 0:
                     game_started = False
                 # the game may have restarted, reset tick
                 current_tick = -1
             else:
-                sleep_duration_time = timing['time_to_next_execution']
+                sleep_duration_time = timing["time_to_next_execution"]
                 logger.info("sleeping", seconds=sleep_duration_time)
                 if sleep_duration_time > 0:
                     time.sleep(sleep_duration_time)
                 else:
-                    logger.warning('Game appears to have ended', time_to_next_execution=sleep_duration_time)
+                    logger.warning(
+                        "Game appears to have ended.",
+                        time_to_next_execution=sleep_duration_time,
+                    )
                     game_started = False
+
+
+if __name__ == "__main__":
+    game_loop()
