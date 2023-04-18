@@ -3,7 +3,7 @@
 <head>
     <script>function refresh() { 
 
-        document.getElementById("image").src="http://127.0.0.1:8000/image?rand" + Math.random(); 
+        document.getElementById("image").src="http://127.0.0.1:8000/game_map?rand" + Math.random(); 
     
     } 
     setInterval(refresh, 2000);
@@ -11,7 +11,7 @@
     <title>Status Page</title>
 </head>
 <body>
-    <div><img id="image" src="http://127.0.0.1:8000/image">
+    <div><img id="image" src="http://127.0.0.1:8000/game_map">
     </div>
 </body>
 

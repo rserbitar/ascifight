@@ -14,9 +14,9 @@ PASSWORD = ""
 
 
 class Orders(str, enum.Enum):
-    move = "move_order"
-    attack = "attack_order"
-    grabput = "grabput_order"
+    move = "move"
+    attack = "attack"
+    grabput = "grabput"
 
 
 class Directions(str, enum.Enum):
@@ -33,7 +33,7 @@ def execute():
 
 
 def place_order(order: Orders, actor: int, direction: Directions) -> httpx.Response:
-    url: str = SERVER + order + f"{actor}"
+    url: str = SERVER + "orders/" + order + f"{actor}"
     return httpx.post(url=url, params={"direction": direction}, auth=(TEAM, PASSWORD))
 
 

@@ -35,9 +35,11 @@ async def single_game() -> None:
     globals.my_game.initiate_game()
 
     logger.info("Starting pre-game.")
-    while pre_game_wait > 0:
-        await asyncio.sleep(1)
-        pre_game_wait -= 1
+    globals.time_to_next_execution = pre_game_wait
+    globals.time_of_next_execution = datetime.datetime.now() + datetime.timedelta(
+        pre_game_wait
+    )
+    await asyncio.sleep(pre_game_wait)
 
     while not globals.my_game.check_game_end():
         await globals.command_queue.put(SENTINEL)

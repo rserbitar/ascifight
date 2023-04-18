@@ -87,6 +87,43 @@ def draw_map(
     return buf.getvalue()
 
 
+def draw_game_map(board):
+    actors = [
+        Icon(
+            name=actor.__class__.__name__[0] + str(actor.ident),
+            coordinates=coordinates,
+            color=util.color_names[actor.team.number],
+        )
+        for actor, coordinates in board.actors_coordinates.items()
+    ]
+    bases = [
+        Icon(
+            name=util.base_icon,
+            coordinates=coordinates,
+            color=util.color_names[base.team.number],
+        )
+        for base, coordinates in board.bases_coordinates.items()
+    ]
+    walls = [
+        Icon(
+            name=util.wall_icon,
+            coordinates=coordinates,
+            color="white",
+        )
+        for coordinates in board.walls_coordinates
+    ]
+    flags = [
+        Icon(
+            name=util.flag_icon,
+            coordinates=coordinates,
+            color=util.color_names[flag.team.number],
+        )
+        for flag, coordinates in board.flags_coordinates.items()
+    ]
+    image = draw_map(actors + bases + walls, flags)
+    # media_type here sets the media type of the actual response sent to the client.
+
+
 if __name__ == "__main__":
     icons = [
         Icon(name="R1", coordinates=data.Coordinates(x=14, y=14), color="yellow"),
