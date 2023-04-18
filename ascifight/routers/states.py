@@ -137,6 +137,10 @@ async def get_timing() -> TimingResponse:
 
 
 @router.get("/game_start")
-async def get_game_start() -> int:
+async def get_game_start() -> float:
     """Return the seconds till the game will start."""
-    return config.config["server"]["pre_game_wait"]
+    return (
+        (globals.time_of_next_execution - datetime.datetime.now()).seconds
+        if not globals.my_game.tick
+        else 0
+    )

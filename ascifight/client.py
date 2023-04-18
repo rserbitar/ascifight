@@ -9,8 +9,8 @@ import time
 logger = structlog.get_logger()
 
 SERVER = "http://127.0.0.1:8000/"
-TEAM = ""
-PASSWORD = ""
+TEAM = "Team 1"
+PASSWORD = "1"
 
 
 class Orders(str, enum.Enum):
@@ -29,7 +29,62 @@ class Directions(str, enum.Enum):
 def execute():
     # put your execution code here
     state = get_information("game_state")
-    # place_order(Orders.move, 0, Directions.left)
+    teams = state["teams"].copy()
+    teams.remove(TEAM)
+    target_team = teams[0]
+    target_base = [base for base in state["bases"] if base["team"] == target_team][0]
+    target_coordinates = target_base["coordinates"]
+    home_base = [base for base in state["bases"] if base["team"] == TEAM][0]
+    home_coordinates = home_base["coordinates"]
+    actor = [actor for actor in state["actors"] if actor["team"] == TEAM][0]
+    actor_coordinates = actor["coordinates"]
+    if not actor["flag"]:
+        direction = httpx.post(
+            url=f"{SERVER}computations/direction",
+            json={"origin": actor_coordinates, "target": target_coordinates},
+        ).json()
+        print(direction)
+        if (
+            httpx.post(
+                url=f"{SERVER}computations/distance",
+                json={"origin": actor_coordinates, "target": target_coordinates},
+            ).json()
+            == 1
+        ):
+            httpx.post(
+                url=f"{SERVER}orders/grabput/{actor['ident']}",
+                params={"direction": direction},
+                auth=(TEAM, PASSWORD),
+            )
+        else:
+            httpx.post(
+                url=f"{SERVER}orders/move/{actor['ident']}",
+                params={"direction": direction},
+                auth=(TEAM, PASSWORD),
+            )
+    else:
+        direction = httpx.post(
+            url=f"{SERVER}computations/direction",
+            json={"origin": actor_coordinates, "target": home_coordinates},
+        ).json()[0]
+        if (
+            httpx.post(
+                url=f"{SERVER}computations/distance",
+                json={"origin": actor_coordinates, "target": home_coordinates},
+            ).json()
+            == 1
+        ):
+            httpx.post(
+                url=f"{SERVER}orders/grabput/{actor['ident']}",
+                params={"direction": direction},
+                auth=(TEAM, PASSWORD),
+            )
+        else:
+            httpx.post(
+                url=f"{SERVER}orders/move/{actor['ident']}",
+                params={"direction": direction},
+                auth=(TEAM, PASSWORD),
+            )
 
 
 def place_order(order: Orders, actor: int, direction: Directions) -> httpx.Response:
@@ -38,7 +93,7 @@ def place_order(order: Orders, actor: int, direction: Directions) -> httpx.Respo
 
 
 def get_information(info_type: str):
-    url = SERVER + info_type
+    url = SERVER + "states/" + info_type
     response = httpx.get(url)
     return response.json()
 
@@ -50,6 +105,7 @@ def game_loop():
         if not game_started:
             try:
                 time_to_start = get_information("game_start")
+                print(time_to_start)
                 if time_to_start > 0:
                     logger.info("waiting until game starts.", seconds=time_to_start)
                     time.sleep(time_to_start)

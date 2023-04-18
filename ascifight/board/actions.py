@@ -190,7 +190,7 @@ class BoardActions:
                     )
                     team_that_scored = scoring_team
                     # return the flag to the base it belongs to
-
+                    self._return_flag_to_base(flag_to_score)
                 else:
                     self._logger.warning("Can not score, flag not at home.")
         return team_that_scored
