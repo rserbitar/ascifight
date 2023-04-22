@@ -1,9 +1,8 @@
 import io
-import os
 
 import pydantic
 from PIL import Image, ImageDraw, ImageFont
-import toml
+import ascifight
 
 import ascifight.config as config
 import ascifight.board.data as data
@@ -87,7 +86,7 @@ def draw_map(
     return buf.getvalue()
 
 
-def draw_game_map(board):
+def draw_game_map(board: data.BoardData) -> bytes:
     actors = [
         Icon(
             name=actor.__class__.__name__[0] + str(actor.ident),
@@ -120,8 +119,7 @@ def draw_game_map(board):
         )
         for flag, coordinates in board.flags_coordinates.items()
     ]
-    image = draw_map(actors + bases + walls, flags)
-    # media_type here sets the media type of the actual response sent to the client.
+    return draw_map(actors + bases + walls, flags)
 
 
 if __name__ == "__main__":

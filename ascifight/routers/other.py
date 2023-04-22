@@ -1,7 +1,6 @@
 import os
 
 from fastapi import APIRouter, Response
-from pydantic import BaseModel, Field
 from starlette.responses import FileResponse
 
 import ascifight.config as config

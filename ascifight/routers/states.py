@@ -137,10 +137,10 @@ async def get_timing() -> TimingResponse:
 
 
 @router.get("/game_start")
-async def get_game_start() -> float:
+async def get_game_start() -> datetime.timedelta:
     """Return the seconds till the game will start."""
     return (
-        (globals.time_of_next_execution - datetime.datetime.now()).seconds
+        globals.time_of_next_execution - datetime.datetime.now()
         if not globals.my_game.tick
-        else 0
+        else datetime.timedelta(0)
     )

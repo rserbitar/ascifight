@@ -102,44 +102,46 @@ def game_loop():
     current_tick = -1
     game_started = False
     while True:
-        if not game_started:
-            try:
+        try:
+            if not game_started:
                 time_to_start = get_information("game_start")
-                print(time_to_start)
                 if time_to_start > 0:
                     logger.info("waiting until game starts.", seconds=time_to_start)
                     time.sleep(time_to_start)
                 else:
                     logger.info("Game has started.")
                     game_started = True
-            except httpx.ConnectError:
-                logger.info("Server not started. Sleeping 10 seconds.")
-                time.sleep(10)
-                continue
-        else:
-            timing = get_information("timing")
-            if timing["tick"] > current_tick:
-                structlog.contextvars.bind_contextvars(tick=timing["tick"])
-                execute()
-                current_tick = timing["tick"]
-                logger.info("Executed tick.")
-            elif timing["tick"] < current_tick:
-                time_to_start = get_information("game_start")
-                if time_to_start > 0:
-                    game_started = False
-                # the game may have restarted, reset tick
-                current_tick = -1
             else:
-                sleep_duration_time = timing["time_to_next_execution"]
-                logger.info("sleeping", seconds=sleep_duration_time)
-                if sleep_duration_time > 0:
-                    time.sleep(sleep_duration_time)
+                timing = get_information("timing")
+                print(timing)
+                if timing["tick"] > current_tick:
+                    structlog.contextvars.bind_contextvars(tick=timing["tick"])
+                    execute()
+                    current_tick = timing["tick"]
+                    logger.info("Executed tick.")
+                elif timing["tick"] < current_tick:
+                    time_to_start = get_information("game_start")
+                    if time_to_start > 0:
+                        game_started = False
+                    # the game may have restarted, reset tick
+                    current_tick = -1
                 else:
-                    logger.warning(
-                        "Game appears to have ended.",
-                        time_to_next_execution=sleep_duration_time,
-                    )
-                    game_started = False
+                    sleep_duration_time = timing["time_to_next_execution"]
+                    logger.info("sleeping", seconds=sleep_duration_time)
+                    if sleep_duration_time >= 0:
+                        time.sleep(sleep_duration_time)
+                    else:
+                        logger.warning(
+                            "Game appears to have ended.",
+                            time_to_next_execution=sleep_duration_time,
+                        )
+                        game_started = False
+        except httpx.ConnectError:
+            logger.info("Server not started. Sleeping 10 seconds.")
+            current_tick = -1
+            game_started = False
+            time.sleep(10)
+            continue
 
 
 if __name__ == "__main__":

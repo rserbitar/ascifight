@@ -37,7 +37,7 @@ async def single_game() -> None:
     logger.info("Starting pre-game.")
     globals.time_to_next_execution = pre_game_wait
     globals.time_of_next_execution = datetime.datetime.now() + datetime.timedelta(
-        pre_game_wait
+        seconds=pre_game_wait
     )
     await asyncio.sleep(pre_game_wait)
 
