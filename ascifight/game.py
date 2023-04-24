@@ -19,7 +19,7 @@ class Order(BaseModel):
     team: str = Field(description="Name of the team to issue the order.")
 
     def __str__(self) -> str:
-        return f"Order by {self.team}"
+        return f"Order by {self.team}."
 
 
 class AttackOrder(Order):
@@ -70,6 +70,36 @@ class GrabPutOrder(Order):
         return f"GrabPutOrder by Actor {self.team}-{self.actor} -> {self.direction}"
 
 
+class BuildOrder(Order):
+    actor: int = Field(
+        description="The id of the actor, specific to the team.",
+        ge=0,
+        le=len(config.config["game"]["actors"]) - 1,
+    )
+    direction: computations.Directions = Field(
+        title="Direction",
+        description="The direction to build from the position of the actor.",
+    )
+
+    def __str__(self) -> str:
+        return f"BuildOrder by Actor {self.team}-{self.actor} -> {self.direction}"
+
+
+class DestroyOrder(Order):
+    actor: int = Field(
+        description="The id of the actor, specific to the team.",
+        ge=0,
+        le=len(config.config["game"]["actors"]) - 1,
+    )
+    direction: computations.Directions = Field(
+        title="Direction",
+        description="The direction to destroy from the position of the actor.",
+    )
+
+    def __str__(self) -> str:
+        return f"DestroyOrder by Actor {self.team}-{self.actor} -> {self.direction}"
+
+
 class Game:
     def __init__(
         self,
@@ -113,6 +143,8 @@ class Game:
         move_orders: list[MoveOrder] = []
         attack_orders: list[AttackOrder] = []
         grabput_orders: list[GrabPutOrder] = []
+        destroy_orders: list[DestroyOrder] = []
+        build_orders: list[BuildOrder] = []
 
         for order in orders:
             if isinstance(order, MoveOrder):
@@ -121,6 +153,10 @@ class Game:
                 attack_orders.append(order)
             elif isinstance(order, GrabPutOrder):
                 grabput_orders.append(order)
+            elif isinstance(order, DestroyOrder):
+                destroy_orders.append(order)
+            elif isinstance(order, BuildOrder):
+                build_orders.append(order)
 
         self.logger.info("Executing move orders.")
         self._execute_move_orders(move_orders)
@@ -130,6 +166,12 @@ class Game:
 
         self.logger.info("Executing attack orders.")
         self._execute_attack_orders(attack_orders)
+
+        self.logger.info("Executing destroy orders.")
+        self._execute_destroy_orders(destroy_orders)
+
+        self.logger.info("Executing build orders.")
+        self._execute_build_orders(build_orders)
 
     def scoreboard(self) -> str:
         current_score = " - ".join(
@@ -243,6 +285,40 @@ class Game:
                     self.scores[team_that_scored] += 1
             else:
                 self.logger.warning(f"{actor} already grabbed this tick.")
+        unbind_contextvars("team")
+
+    def _execute_destroy_orders(self, destroy_orders: list[DestroyOrder]) -> None:
+        already_destroyed = self._actor_dict(False)
+        for order in destroy_orders:
+            bind_contextvars(team=order.team)
+            self.logger.info(f"Executing {order}")
+            actor = self.board.teams_actors[
+                (self.board.names_teams[order.team], order.actor)
+            ]
+
+            if already_destroyed[actor]:
+                self.logger.warning(f"{actor} already destroyed this tick.")
+            else:
+                already_destroyed[actor] = self.board_actions.destroy(
+                    actor, order.direction
+                )
+
+        unbind_contextvars("team")
+
+    def _execute_build_orders(self, build_orders: list[BuildOrder]) -> None:
+        already_built = self._actor_dict(False)
+        for order in build_orders:
+            bind_contextvars(team=order.team)
+            self.logger.info(f"Executing {order}")
+            actor = self.board.teams_actors[
+                (self.board.names_teams[order.team], order.actor)
+            ]
+
+            if already_built[actor]:
+                self.logger.warning(f"{actor} already built this tick.")
+            else:
+                already_built[actor] = self.board_actions.build(actor, order.direction)
+
         unbind_contextvars("team")
 
     def check_game_end(self):

@@ -87,6 +87,8 @@ class Actor(BoardObject, abc.ABC):
     team: Team
     grab = 0.0
     attack = 0.0
+    build = 0.0
+    destroy = 0.0
     flag: Flag | None = None
 
     def __str__(self):
@@ -122,8 +124,16 @@ class Attacker(Actor):
     attack = 1.0
 
 
-class Blocker(Actor):
+class Guardian(Actor):
     pass
+
+
+class Builder(Actor):
+    build = 0.2
+
+
+class Destroyer(Actor):
+    destroy = 0.25
 
 
 class Base(BoardObject):

@@ -186,6 +186,24 @@ Attack actions only have a certain probability to work. If the _attack_ property
 
 Only _actors_ with a non-zero _attack_ property can _attack_.
 
+### Destroy Order
+
+Destroy orders you can remove those pesky walls. Just walk up to them and target the next wall with a destroy order.
+
+
+Destroy actions only have a certain probability to work. If the _destroy_ property of an _actor_ is smaller than 1, destroying might not succeed always.
+
+Only _actors_ with a non-zero _destroy_ property can _destroy_.
+
+### Build Order
+
+Build orders can get you more walls where you want them. Walk next to the location where you want a wall and then start building.
+
+
+Build actions only have a certain probability to work. If the _build_ property of an _actor_ is smaller than 1, building might not succeed always.
+
+Only _actors_ with a non-zero _build_ property can _build_.
+
 ## States
 
 To act you need to know things. ASCI fight is a perfect information game. So you can directly see what you need to do and what your actions have caused.

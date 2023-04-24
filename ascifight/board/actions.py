@@ -15,7 +15,7 @@ class BoardActions:
         game_board_data: data.BoardData,
     ):
         self._logger = structlog.get_logger()
-        self.board_data = game_board_data
+        self.board_data: data.BoardData = game_board_data
         with open("config.toml", mode="r") as fp:
             self.config = toml.load(fp)
 
@@ -75,13 +75,60 @@ class BoardActions:
                 )
             else:
                 attack_successful = random.random() < actor.attack
+                attacked = True
                 if not attack_successful:
                     self._logger.info(f"{actor} attacked and missed {target}.")
                 else:
                     self._logger.info(f"{actor} attacked and hit {target}.")
                     self._respawn(target)
-                    attacked = True
         return attacked
+
+    def build(self, actor: data.Actor, direction: computations.Directions) -> bool:
+        built = False
+        if not actor.build:
+            self._logger.warning(f"{actor} can not build.")
+        else:
+            target_coordinates = self.calc_target_coordinates(actor, direction)
+            illegal_target = (
+                self.board_data.coordinates_actors.get(target_coordinates)
+                or self.board_data.coordinates_bases.get(target_coordinates)
+                or self.board_data.coordinates_flags.get(target_coordinates)
+                or target_coordinates in self.board_data.walls_coordinates
+            )
+            if illegal_target:
+                self._logger.warning(f"Target field is either not empty.")
+            else:
+                build_successful = random.random() < actor.build
+                built = True
+                if not build_successful:
+                    self._logger.info(f"Building did not work.")
+                else:
+                    self._logger.info(
+                        f"{actor} successfully built a wall at {target_coordinates}."
+                    )
+                    self.board_data.walls_coordinates.add(target_coordinates)
+        return built
+
+    def destroy(self, actor: data.Actor, direction: computations.Directions) -> bool:
+        destroyed = False
+        if not actor.destroy:
+            self._logger.warning(f"{actor} can not destroy.")
+        else:
+            target_coordinates = self.calc_target_coordinates(actor, direction)
+            target = target_coordinates in self.board_data.walls_coordinates
+            if not target:
+                self._logger.warning(f"Target field does not contain a wall.")
+            else:
+                destroy_successful = random.random() < actor.destroy
+                destroyed = True
+                if not destroy_successful:
+                    self._logger.info(f"Destruction did not work.")
+                else:
+                    self._logger.info(
+                        f"{actor} successfully destroyed a wall at {target_coordinates}."
+                    )
+                    self.board_data.walls_coordinates.add(target_coordinates)
+        return destroyed
 
     def grabput_flag(
         self, actor: data.Actor, direction: computations.Directions
