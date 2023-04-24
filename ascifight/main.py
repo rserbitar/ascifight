@@ -72,7 +72,7 @@ app = FastAPI(
     openapi_tags=tags_metadata,
     title="A Social, Community Increasing - Fight",
     description=util.api_description,
-    version="0.1",
+    version="0.2.0",
     contact={
         "name": "Ralf Kelzenberg",
         "url": "http://vodafone.com",
