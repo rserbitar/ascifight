@@ -87,7 +87,7 @@ class Game:
         self.board_actions = actions.BoardActions(self.board)
         self.scores: dict[data.Team, int] = {}
         self.overall_score: dict[data.Team, int] = {}
-        self.tick = 0
+        self.tick = -1
         self.max_ticks = max_ticks
         self.max_score = max_score
 

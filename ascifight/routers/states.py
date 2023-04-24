@@ -128,19 +128,9 @@ async def get_game_rules() -> RulesResponse:
 
 @router.get("/timing")
 async def get_timing() -> TimingResponse:
-    """Get the current tick and time of next execution."""
+    """Get the current tick and time of next execution. If current tick is smaller than 0, game has not yet started."""
     return TimingResponse(
         tick=globals.my_game.tick,
         time_to_next_execution=globals.time_of_next_execution - datetime.datetime.now(),
         time_of_next_execution=globals.time_of_next_execution,
-    )
-
-
-@router.get("/game_start")
-async def get_game_start() -> datetime.timedelta:
-    """Return the seconds till the game will start."""
-    return (
-        globals.time_of_next_execution - datetime.datetime.now()
-        if not globals.my_game.tick
-        else datetime.timedelta(0)
     )
