@@ -18,7 +18,7 @@ T = TypeVar("T")
 class Order(BaseModel):
     team: str = Field(description="Name of the team to issue the order.")
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"Order by {self.team}"
 
 
@@ -33,7 +33,7 @@ class AttackOrder(Order):
         description="The direction to attack from the position of the actor.",
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"AttackOrder by Actor {self.team}-{self.actor} -> {self.direction}"
 
 
@@ -48,7 +48,7 @@ class MoveOrder(Order):
         description="The direction to move to from the position of the actor. 'up' increases the y coordinate and 'right' increases the x coordinate.",
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"MoveOrder by Actor {self.team}-{self.actor} -> {self.direction}"
 
 
@@ -66,7 +66,7 @@ class GrabPutOrder(Order):
         ),
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"GrabPutOrder by Actor {self.team}-{self.actor} -> {self.direction}"
 
 
@@ -80,16 +80,16 @@ class Game:
         max_score: int = config.config["game"]["max_score"],
     ) -> None:
         self.logger = structlog.get_logger()
-        self.score_file = score_file
-        self.score_multiplier = score_multiplier
+        self.score_file: str = score_file
+        self.score_multiplier: int = score_multiplier
 
         self.board = game_board
         self.board_actions = actions.BoardActions(self.board)
         self.scores: dict[data.Team, int] = {}
         self.overall_score: dict[data.Team, int] = {}
-        self.tick = -1
-        self.max_ticks = max_ticks
-        self.max_score = max_score
+        self.tick = 0
+        self.max_ticks: int = max_ticks
+        self.max_score: int = max_score
 
     def initiate_game(self) -> None:
         game_board_setup = setup.BoardSetup(
@@ -103,8 +103,9 @@ class Game:
         self._set_scores()
         self._read_scores()
 
-    def end_game(self):
+    def end_game(self) -> None:
         self._write_scores()
+        self.logger.info("Game ended.")
 
     def execute_game_step(self, orders: list[Order]) -> None:
         self.tick += 1

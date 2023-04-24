@@ -154,8 +154,8 @@ class BoardData:
     ) -> None:
         self._logger = structlog.get_logger()
 
-        self.map_size = map_size
-        self.walls = walls
+        self.map_size: int = map_size
+        self.walls: int = walls
 
         self.names_teams: dict[str, Team] = {
             team["name"]: Team(name=team["name"], password=team["password"], number=i)
@@ -173,9 +173,9 @@ class BoardData:
 
     @property
     def actors_of_team(self) -> dict[str, list[Actor]]:
-        actors_of_team = {}
+        actors_of_team: dict[str, list[Actor]] = {}
         for team in self.teams:
-            actors = []
+            actors: list[Actor] = []
             for i in range(len(self.actor_classes)):
                 actors.append(self.teams_actors[(team, i)])
             actors_of_team[team.name] = actors
