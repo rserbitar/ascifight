@@ -218,11 +218,7 @@ This section is static per game and tells you what each actor can do, if the fla
 
 ### Game Timing
 
-The current tick and when the next tick executes both on absolute time and time-deltas. This is more lightweight than the _Game State_ an can be queried often. 
-
-### Game Start
-
-If the game has not started yet, this service tells you when it will.
+Here you get the current tick and when the next tick executes both on absolute time and time-deltas. This is more lightweight than the _Game State_ an can be queried often. 
 
 ## Logistics
 
