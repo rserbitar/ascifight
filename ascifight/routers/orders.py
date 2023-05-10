@@ -73,6 +73,18 @@ async def move_order(
     return {"message": "Move order added."}
 
 
+@router.post("/grabput/{actor}")
+async def grabput_order(
+    team: Annotated[str, Depends(get_current_team)],
+    actor: actor_annotation,
+    direction: direction_annotation,
+) -> dict[str, str]:
+    """If the actor has a flag it puts it, even to another actor that can carry it. If it doesn't have a flag, it grabs it, even from another actor."""
+    order = game.GrabPutOrder(team=team, actor=actor, direction=direction)
+    globals.command_queue.put_nowait(order)
+    return {"message": "Grabput order added."}
+
+
 @router.post("/attack/{actor}")
 async def attack_order(
     team: Annotated[str, Depends(get_current_team)],
@@ -84,14 +96,26 @@ async def attack_order(
     globals.command_queue.put_nowait(order)
     return {"message": "Attack order added."}
 
-
-@router.post("/grabput/{actor}")
-async def grabput_order(
+@router.post("/destroy/{actor}")
+async def destroy_order(
     team: Annotated[str, Depends(get_current_team)],
     actor: actor_annotation,
     direction: direction_annotation,
 ) -> dict[str, str]:
-    """If the actor has a flag it puts it, even to another actor that can carry it. If it doesn't have a flag, it grabs it, even from another actor."""
-    order = game.GrabPutOrder(team=team, actor=actor, direction=direction)
+    """Only actors with the destroy property can attack."""
+    order = game.DestroyOrder(team=team, actor=actor, direction=direction)
     globals.command_queue.put_nowait(order)
-    return {"message": "Grabput order added."}
+    return {"message": "Destroy order added."}
+
+@router.post("/build/{actor}")
+async def build_order(
+    team: Annotated[str, Depends(get_current_team)],
+    actor: actor_annotation,
+    direction: direction_annotation,
+) -> dict[str, str]:
+    """Only actors with the build property can attack."""
+    order = game.BuildOrder(team=team, actor=actor, direction=direction)
+    globals.command_queue.put_nowait(order)
+    return {"message": "Build order added."}
+
+

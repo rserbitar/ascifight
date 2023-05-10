@@ -1,16 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <script>function refresh() { 
+    <script>
+    async function refresh() { 
+        document.getElementById("image").src="http://127.0.0.1:8000/game_map?rand" + Math.random();
 
-        document.getElementById("image").src="http://127.0.0.1:8000/game_map?rand" + Math.random(); 
-    
+        const response = await fetch('http://127.0.0.1:8000/states/game_state').then();
+        const content = await response.json();
+        const score_text = JSON.stringify(content.scores)
+        console.log(score_text);
+        document.getElementById("score").innerHTML=score_text;
     } 
     setInterval(refresh, 2000);
+
+
+
       </script>
     <title>Status Page</title>
 </head>
 <body>
+    <div id="score"></div>
     <div><img id="image" src="http://127.0.0.1:8000/game_map">
     </div>
 </body>
