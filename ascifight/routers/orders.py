@@ -96,6 +96,7 @@ async def attack_order(
     globals.command_queue.put_nowait(order)
     return {"message": "Attack order added."}
 
+
 @router.post("/destroy/{actor}")
 async def destroy_order(
     team: Annotated[str, Depends(get_current_team)],
@@ -107,6 +108,7 @@ async def destroy_order(
     globals.command_queue.put_nowait(order)
     return {"message": "Destroy order added."}
 
+
 @router.post("/build/{actor}")
 async def build_order(
     team: Annotated[str, Depends(get_current_team)],
@@ -117,5 +119,3 @@ async def build_order(
     order = game.BuildOrder(team=team, actor=actor, direction=direction)
     globals.command_queue.put_nowait(order)
     return {"message": "Build order added."}
-
-

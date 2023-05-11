@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 import ascifight.config as config
 import ascifight.globals as globals
 import ascifight.board.data as data
+import ascifight.util as util
 
 
 class ActorDescription(BaseModel):
@@ -31,6 +32,19 @@ class BaseDescription(BaseModel):
     team: str = Field(description="The name of the base's team.")
     coordinates: data.Coordinates = Field(
         description="The current coordinates fo the base."
+    )
+
+
+class Scores(BaseModel):
+    team: str = Field(description="The name of the team.")
+    score: int = Field(description="The scores of the current game.")
+    color: str = Field(description="The color of the team.")
+
+
+class AllScores(BaseModel):
+    scores: list[Scores] = Field(description="The scores of the current game.")
+    overall_scores: list[Scores] = Field(
+        description="The current overall scores of all games."
     )
 
 
@@ -110,6 +124,21 @@ async def get_game_state() -> StateResponse:
         scores={team.name: score for team, score in globals.my_game.scores.items()},
         tick=globals.my_game.tick,
         time_of_next_execution=globals.time_of_next_execution,
+    )
+
+
+@router.get("/scores")
+async def get_scores():
+    """Get the current state of the game including locations of all actors, flags, bases and walls."""
+    return AllScores(
+        scores=[
+            Scores(team=team.name, score=score, color=util.color_names[team.number])
+            for team, score in globals.my_game.scores.items()
+        ],
+        overall_scores=[
+            Scores(team=team.name, score=score, color=util.color_names[team.number])
+            for team, score in globals.my_game.overall_scores.items()
+        ],
     )
 
 

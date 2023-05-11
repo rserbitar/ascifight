@@ -1,27 +1,32 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+  <head>
     <script>
-    async function refresh() { 
-        document.getElementById("image").src="http://127.0.0.1:8000/game_map?rand" + Math.random();
+      async function refresh() {
+        document.getElementById("image").src =
+          "http://127.0.0.1:8000/game_map?rand" + Math.random();
 
-        const response = await fetch('http://127.0.0.1:8000/states/game_state').then();
-        const content = await response.json();
-        const score_text = JSON.stringify(content.scores)
-        console.log(score_text);
-        document.getElementById("score").innerHTML=score_text;
-    } 
-    setInterval(refresh, 2000);
-
-
-
-      </script>
+        const response = await fetch(
+          "http://127.0.0.1:8000/states/scores"
+        ).then();
+        const scores = await response.json();
+        score_string = '<h2 style="color: white"> This Game: ';
+        for (const score of scores.scores) {
+          score_string += `<span style="color: ${score.color}">${score.team}: ${score.score} </span> - `;
+        }
+        score_string += '</h2><h2 style="color: white"> All Games: ';
+        for (const score of scores.overall_scores) {
+          score_string += `<span style="color: ${score.color}">${score.team}: ${score.score} </span> - `;
+        }
+        score_string += "</h2>";
+        document.getElementById("score").innerHTML = score_string;
+      }
+      setInterval(refresh, 2000);
+    </script>
     <title>Status Page</title>
-</head>
-<body>
+  </head>
+  <body style="background-color: black">
     <div id="score"></div>
-    <div><img id="image" src="http://127.0.0.1:8000/game_map">
-    </div>
-</body>
-
+    <div><img id="image" src="" /></div>
+  </body>
 </html>

@@ -116,7 +116,7 @@ class Game:
         self.board = game_board
         self.board_actions = actions.BoardActions(self.board)
         self.scores: dict[data.Team, int] = {}
-        self.overall_score: dict[data.Team, int] = {}
+        self.overall_scores: dict[data.Team, int] = {}
         self.tick = 0
         self.max_ticks: int = max_ticks
         self.max_score: int = max_score
@@ -183,7 +183,7 @@ class Game:
         overall_score = " - ".join(
             [
                 f"{util.colors[team.number]}{team.name}: {score}{util.colors['revert']}"
-                for team, score in self.overall_score.items()
+                for team, score in self.overall_scores.items()
             ]
         )
         return f"{util.colors['bold']}Overall Score{util.colors['revert']}: {overall_score} \n{util.colors['bold']}Current Score{util.colors['revert']}: {current_score}"
@@ -191,7 +191,7 @@ class Game:
     def _set_scores(self) -> None:
         for team in self.board.names_teams.values():
             self.scores[team] = 0
-            self.overall_score[team] = 0
+            self.overall_scores[team] = 0
 
     def _write_scores(self):
         game_scores = []
@@ -215,7 +215,7 @@ class Game:
                     score = int(score)
                     team = team.strip()
                     try:
-                        self.overall_score[self.board.names_teams[team]] += score
+                        self.overall_scores[self.board.names_teams[team]] += score
                     # ignore score if team is not in current teams
                     except ValueError:
                         pass
