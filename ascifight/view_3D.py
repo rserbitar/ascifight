@@ -20,6 +20,7 @@ class CachedGameInfo:
 
 
 class AsciFight3D:
+    animation_steps = 10
 
     def __init__(self):
         self.static_vobjects = {}
@@ -27,6 +28,7 @@ class AsciFight3D:
         self.game_information = CachedGameInfo()
         self.actor_drawer = collections.defaultdict(self.new_runner)
         self.actor_drawer['Runner'] = self.new_runner
+        self.animations = {}
 
         vpython.scene.width = 800
         vpython.scene.height = 800
@@ -55,6 +57,7 @@ class AsciFight3D:
     def new_step(self):
         self.game_information.reset()
         self.set_caption()
+        self.animations = {}
         for vobject in self.dynamic_vobjects.values():
             vobject.ascifight_update = False
 
@@ -103,11 +106,8 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
         if object_id in self.dynamic_vobjects:
             old_pos = self.dynamic_vobjects[object_id].pos
             if old_pos != pos:
-                dpos = (pos - old_pos) / 10
-                for i in range(10):
-                    self.dynamic_vobjects[object_id].pos += dpos
-                    vpython.rate(60)
-            self.dynamic_vobjects[object_id].pos = pos
+                dpos = (pos - old_pos) / self.animation_steps
+                self.animations[object_id] = (dpos, pos)
             self.dynamic_vobjects[object_id].ascifight_update = True
             return True
         return False
@@ -157,11 +157,21 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
 
     def update(self):
         self.new_step()
+        print(self.state)
         self.draw_bases()
         self.draw_actors()
         self.draw_flags()
-        print(self.state)
+        self.animate()
         self.cleanup()
+
+    def animate(self):
+        for i in range(self.animation_steps):
+            for v_id, (dpos, _) in self.animations.items():
+                self.dynamic_vobjects[v_id].pos += dpos
+            vpython.rate(60)
+        # Avoid floating point inaccuracies
+        for v_id, (_, new_pos) in self.animations.items():
+            self.dynamic_vobjects[v_id].pos = new_pos
 
 
 def game_loop():
