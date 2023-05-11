@@ -25,8 +25,8 @@ class AsciFight3D:
         self.static_vobjects = {}
         self.dynamic_vobjects = {}
         self.game_information = CachedGameInfo()
-        self.actor_drawer = collections.defaultdict(self.draw_new_runner)
-        self.actor_drawer['Runner'] = self.draw_new_runner
+        self.actor_drawer = collections.defaultdict(self.new_runner)
+        self.actor_drawer['Runner'] = self.new_runner
 
         vpython.scene.width = 800
         vpython.scene.height = 800
@@ -110,16 +110,22 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
     def coordinates_to_vector(coordinates):
         return vpython.vector(coordinates['x'], coordinates['y'], 0)
 
+    def move_or_create(self, v_id, game_object, drawer):
+        pos = self.coordinates_to_vector(game_object['coordinates'])
+        if not self.move_vobject(v_id, pos):
+            color = self.team_to_color(game_object['team'])
+            self.dynamic_vobjects[v_id] = drawer(pos, color)
+
     def draw_bases(self):
         for i, base in enumerate(self.state['bases']):
-            pos = self.coordinates_to_vector(base['coordinates'])
             v_id = f'base_{i}'
-            if not self.move_vobject(v_id, pos):
-                color = self.team_to_color(base['team'])
-                self.dynamic_vobjects[v_id] = vpython.cylinder(pos=pos, axis=vpython.vector(0, 0, 0.5), radius=0.45,
-                                                               color=color)
+            self.move_or_create(v_id, base, self.new_base)
 
-    def draw_new_runner(self, pos, color):
+    def new_base(self, pos, color):
+        return vpython.cylinder(pos=pos, axis=vpython.vector(0, 0, 0.5), radius=0.45,
+                                color=color)
+
+    def new_runner(self, pos, color):
         return vpython.cone(pos=pos, color=color, radius=0.3, axis=vpython.vector(0, 0, 1))
 
     def draw_actors(self):
@@ -128,12 +134,8 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
             index1 = self.team_index(actor['team'])
             index2 = actor['ident']
             v_id = f'{actor_type}_{index1}_{index2}'
-            pos = self.coordinates_to_vector(actor['coordinates'])
-
-            if not self.move_vobject(v_id, pos):
-                draw_function = self.actor_drawer[actor_type]
-                color = self.team_to_color(actor['team'])
-                self.dynamic_vobjects[v_id] = draw_function(pos, color)
+            draw_function = self.actor_drawer[actor_type]
+            self.move_or_create(v_id, actor, draw_function)
 
     def update(self):
         self.new_step()
