@@ -66,9 +66,15 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
         vpython.scene.center = vpython.vector(map_size / 2, map_size / 2, 0)
         for x in range(map_size):
             for y in range(map_size):
-                new_square = vpython.box(pos=vpython.vector(x, y, 0), length=1, width=0.1, height=1)
-                new_square.color = (vpython.color.white, vpython.color.black)[(x + y) % 2]
+                new_square = vpython.box(pos=vpython.vector(x, y, 0), length=1, width=0.1, height=1,
+                                         color=(vpython.color.white, vpython.color.black)[(x + y) % 2])
                 self.vobjects[f'square_{x}_{y}'] = new_square
+            new_text_x = vpython.text(pos=vpython.vector(x - 0.4, -1, 0), align='left', color=vpython.color.white,
+                                      height=0.8, depth=0.1, text=str(x), axis=vpython.vector(0, -1, 0))
+            new_text_y = vpython.text(pos=vpython.vector(-1, x - 0.4, 0), align='right', color=vpython.color.white,
+                                      height=0.8, depth=0.1, text=str(x))
+            self.vobjects[f'label_x_{x}'] = new_text_x
+            self.vobjects[f'label_y_{x}'] = new_text_y
 
     def update_vobject(self, object_id, **kwargs):
         if object_id in self.vobjects:
