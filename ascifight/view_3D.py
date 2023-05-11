@@ -101,6 +101,12 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
 
     def move_vobject(self, object_id, pos):
         if object_id in self.dynamic_vobjects:
+            old_pos = self.dynamic_vobjects[object_id].pos
+            if old_pos != pos:
+                dpos = (pos - old_pos) / 10
+                for i in range(10):
+                    self.dynamic_vobjects[object_id].pos += dpos
+                    vpython.rate(60)
             self.dynamic_vobjects[object_id].pos = pos
             self.dynamic_vobjects[object_id].ascifight_update = True
             return True
