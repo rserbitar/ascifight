@@ -1,3 +1,4 @@
+import collections
 import time
 
 import httpx
@@ -19,15 +20,23 @@ class CachedGameInfo:
 
 
 class AsciFight3D:
+
     def __init__(self):
         self.static_vobjects = {}
         self.dynamic_vobjects = {}
         self.game_information = CachedGameInfo()
+        self.actor_drawer = collections.defaultdict(self.draw_new_runner)
+        self.actor_drawer['Runner'] = self.draw_new_runner
+
         vpython.scene.width = 800
         vpython.scene.height = 800
 
-    def team_to_color(self, team):
+    def team_index(self, team):
         index = self.state['teams'].index(team)
+        return index
+
+    def team_to_color(self, team):
+        index = self.team_index(team)
         color_name = ascifight.util.color_names[index]
         return getattr(vpython.color, color_name)
 
@@ -90,26 +99,47 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
             self.static_vobjects[f'label_x_{x}'] = new_text_x
             self.static_vobjects[f'label_y_{x}'] = new_text_y
 
-    def update_vobject(self, object_id, **kwargs):
+    def move_vobject(self, object_id, pos):
         if object_id in self.dynamic_vobjects:
-            for arg, value in kwargs.items():
-                setattr(self.dynamic_vobjects[object_id], arg, value)
+            self.dynamic_vobjects[object_id].pos = pos
             self.dynamic_vobjects[object_id].ascifight_update = True
             return True
         return False
 
+    @staticmethod
+    def coordinates_to_vector(coordinates):
+        return vpython.vector(coordinates['x'], coordinates['y'], 0)
+
     def draw_bases(self):
         for i, base in enumerate(self.state['bases']):
-            color = self.team_to_color(base['team'])
-            pos = vpython.vector(base['coordinates']['x'], base['coordinates']['y'], 0)
+            pos = self.coordinates_to_vector(base['coordinates'])
             v_id = f'base_{i}'
-            if not self.update_vobject(v_id, pos=pos, color=color):
+            if not self.move_vobject(v_id, pos):
+                color = self.team_to_color(base['team'])
                 self.dynamic_vobjects[v_id] = vpython.cylinder(pos=pos, axis=vpython.vector(0, 0, 0.5), radius=0.45,
                                                                color=color)
+
+    def draw_new_runner(self, pos, color):
+        return vpython.cone(pos=pos, color=color, radius=0.3, axis=vpython.vector(0, 0, 1))
+
+    def draw_actors(self):
+        for i, actor in enumerate(self.state['actors']):
+            actor_type = actor['type']
+            index1 = self.team_index(actor['team'])
+            index2 = actor['ident']
+            v_id = f'{actor_type}_{index1}_{index2}'
+            pos = self.coordinates_to_vector(actor['coordinates'])
+
+            if not self.move_vobject(v_id, pos):
+                draw_function = self.actor_drawer[actor_type]
+                color = self.team_to_color(actor['team'])
+                self.dynamic_vobjects[v_id] = draw_function(pos, color)
 
     def update(self):
         self.new_step()
         self.draw_bases()
+        self.draw_actors()
+        print(self.state)
         self.cleanup()
 
 
