@@ -148,61 +148,7 @@ You, and your actors, cant walk through these!
 
 You can perform a couple of orders do reach your goals of co-worker domination. Orders are executed in the order (no pun intended) 
 below. 
-But beware, each _actor_ can only carry out each order only once per game tick.
-
-### Move Order
-
-With a move order you can move around any of your _actors_, by exactly one field in any non-diagonal direction. 
-
-It is not allowed to step on fields:
-
-* **contain another actor**
-* **contain a base**
-* **contain a wall field**
-
-If an _actor_ moves over the flag of its own team, the flag is returned to its base!
-
-### GrabPut Order
-
-If an _actor_ does not have the flag, it can grab it with this order. Give it a direction from its current position and it will try to grab
-the _flag_ from the target field. 
-
-If an _actor_ does have the flag it can put it into a target field. This target field can be empty or contain an _actor_, but not a wall.
-If the target field contains an _actor_ that can not carry the flag (_grab_ property is zero) this will not work. If an _actor_ puts a an enemy flag
-on its on base, while the flag is at home, you **score**!
-
-
-GrabPut actions only have a certain probability to work. If the _grab_ property of an _actor_ is smaller than 1, grabbing or putting might not succeed always.
-
-
-Only _actors_ with a non-zero _grab_ property can _grabput_.
-
-### Attack Order
-
-With attack orders you can force other actors, even your own, to respawn near their base. Just hit them and they are gone.
-
-
-Attack actions only have a certain probability to work. If the _attack_ property of an _actor_ is smaller than 1, attacking might not succeed always.
-
-Only _actors_ with a non-zero _attack_ property can _attack_.
-
-### Destroy Order
-
-Destroy orders you can remove those pesky walls. Just walk up to them and target the next wall with a destroy order.
-
-
-Destroy actions only have a certain probability to work. If the _destroy_ property of an _actor_ is smaller than 1, destroying might not succeed always.
-
-Only _actors_ with a non-zero _destroy_ property can _destroy_.
-
-### Build Order
-
-Build orders can get you more walls where you want them. Walk next to the location where you want a wall and then start building.
-
-
-Build actions only have a certain probability to work. If the _build_ property of an _actor_ is smaller than 1, building might not succeed always.
-
-Only _actors_ with a non-zero _build_ property can _build_.
+But beware, each _actor_ can only carry out each order only once per game tick. Find the documentation of the orders in the auto-generated docs below.
 
 ## States
 
