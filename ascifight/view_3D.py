@@ -122,17 +122,24 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
             color = self.team_to_color(game_object['team'])
             self.dynamic_vobjects[v_id] = drawer(pos, color)
 
-    def draw_bases(self):
-        for i, base in enumerate(self.state['bases']):
-            v_id = f'base_{i}'
-            self.move_or_create(v_id, base, self.new_base)
-
     def new_base(self, pos, color):
         return vpython.cylinder(pos=pos, axis=vpython.vector(0, 0, 0.5), radius=0.45,
                                 color=color)
 
     def new_runner(self, pos, color):
         return vpython.cone(pos=pos, color=color, radius=0.3, axis=vpython.vector(0, 0, 1))
+
+    def new_flag(self, pos, color):
+        handle = vpython.cylinder(color=vpython.vector(0.72, 0.42, 0), axis=vpython.vector(0, 0, 3), radius=0.05,
+                                  pos=pos)
+        head = vpython.box(color=color, pos=pos + vpython.vector(0, 0.5, 3), length=0.1, width=1, height=1)
+        flag = vpython.compound([handle, head], origin=pos)
+        return flag
+
+    def draw_bases(self):
+        for i, base in enumerate(self.state['bases']):
+            v_id = f'base_{i}'
+            self.move_or_create(v_id, base, self.new_base)
 
     def draw_actors(self):
         for i, actor in enumerate(self.state['actors']):
@@ -143,10 +150,16 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
             draw_function = self.actor_drawer[actor_type]
             self.move_or_create(v_id, actor, draw_function)
 
+    def draw_flags(self):
+        for i, flag in enumerate(self.state['flags']):
+            v_id = f'flag_{i}'
+            self.move_or_create(v_id, flag, self.new_flag)
+
     def update(self):
         self.new_step()
         self.draw_bases()
         self.draw_actors()
+        self.draw_flags()
         print(self.state)
         self.cleanup()
 
