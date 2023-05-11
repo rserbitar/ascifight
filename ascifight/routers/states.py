@@ -41,7 +41,7 @@ class Scores(BaseModel):
     color: str = Field(description="The color of the team.")
 
 
-class AllScores(BaseModel):
+class AllScoresResponse(BaseModel):
     scores: list[Scores] = Field(description="The scores of the current game.")
     overall_scores: list[Scores] = Field(
         description="The current overall scores of all games."
@@ -128,9 +128,9 @@ async def get_game_state() -> StateResponse:
 
 
 @router.get("/scores")
-async def get_scores():
+async def get_scores() -> AllScoresResponse:
     """Get the scores of the current game as well as all games in total."""
-    return AllScores(
+    return AllScoresResponse(
         scores=[
             Scores(team=team.name, score=score, color=util.color_names[team.number])
             for team, score in globals.my_game.scores.items()
