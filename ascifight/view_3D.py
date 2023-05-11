@@ -20,7 +20,8 @@ class CachedGameInfo:
 
 class AsciFight3D:
     def __init__(self):
-        self.vobjects = {}
+        self.static_vobjects = {}
+        self.dynamic_vobjects = {}
         self.game_information = CachedGameInfo()
         vpython.scene.width = 800
         vpython.scene.height = 800
@@ -42,11 +43,25 @@ class AsciFight3D:
     def state(self):
         return self.game_information.information('game_state')
 
+    def new_step(self):
+        self.game_information.reset()
+        self.set_caption()
+        for vobject in self.dynamic_vobjects.values():
+            vobject.ascifight_update = False
+
+    def cleanup(self):
+        for ref, vobject in list(self.dynamic_vobjects.items()):
+            if hasattr(vobject, 'ascifight_update') and not vobject.ascifight_update:
+                vobject.visible = False
+                del self.static_vobjects[ref]
+
     def reset(self):
-        for ref, vobject in list(self.vobjects):
+        for ref, vobject in list(self.static_vobjects.items()):
             vobject.visible = False
-            del self.vobjects[ref]
-        assert len(self.vobjects) == 0
+            del self.static_vobjects[ref]
+        for ref, vobject in list(self.dynamic_vobjects.items()):
+            vobject.visible = False
+            del self.static_vobjects[ref]
         self.initialize_board()
 
     def set_caption(self):
@@ -60,26 +75,26 @@ To pan left/right and up/down, Shift-drag.
 Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
 
     def initialize_board(self):
-        self.game_information.reset()
-        self.set_caption()
+        self.new_step()
         map_size = self.rules['map_size']
         vpython.scene.center = vpython.vector(map_size / 2, map_size / 2, 0)
         for x in range(map_size):
             for y in range(map_size):
                 new_square = vpython.box(pos=vpython.vector(x, y, 0), length=1, width=0.1, height=1,
                                          color=(vpython.color.white, vpython.color.black)[(x + y) % 2])
-                self.vobjects[f'square_{x}_{y}'] = new_square
+                self.static_vobjects[f'square_{x}_{y}'] = new_square
             new_text_x = vpython.text(pos=vpython.vector(x - 0.4, -1, 0), align='left', color=vpython.color.white,
                                       height=0.8, depth=0.1, text=str(x), axis=vpython.vector(0, -1, 0))
             new_text_y = vpython.text(pos=vpython.vector(-1, x - 0.4, 0), align='right', color=vpython.color.white,
                                       height=0.8, depth=0.1, text=str(x))
-            self.vobjects[f'label_x_{x}'] = new_text_x
-            self.vobjects[f'label_y_{x}'] = new_text_y
+            self.static_vobjects[f'label_x_{x}'] = new_text_x
+            self.static_vobjects[f'label_y_{x}'] = new_text_y
 
     def update_vobject(self, object_id, **kwargs):
-        if object_id in self.vobjects:
+        if object_id in self.dynamic_vobjects:
             for arg, value in kwargs.items():
-                setattr(self.vobjects[object_id], arg, value)
+                setattr(self.dynamic_vobjects[object_id], arg, value)
+            self.dynamic_vobjects[object_id].ascifight_update = True
             return True
         return False
 
@@ -89,14 +104,13 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
             pos = vpython.vector(base['coordinates']['x'], base['coordinates']['y'], 0)
             v_id = f'base_{i}'
             if not self.update_vobject(v_id, pos=pos, color=color):
-                self.vobjects[v_id] = vpython.cylinder(pos=pos, axis=vpython.vector(0, 0, 0.5), radius=0.45,
-                                                       color=color)
+                self.dynamic_vobjects[v_id] = vpython.cylinder(pos=pos, axis=vpython.vector(0, 0, 0.5), radius=0.45,
+                                                               color=color)
 
     def update(self):
-        self.game_information.reset()
-        self.set_caption()
-
+        self.new_step()
         self.draw_bases()
+        self.cleanup()
 
 
 def game_loop():
