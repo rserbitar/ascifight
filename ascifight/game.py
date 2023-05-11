@@ -199,7 +199,7 @@ class Game:
 
     def _write_scores(self):
         game_scores = []
-        scores = sorted(self.scores.items(), reverse=True)
+        scores = sorted(self.scores.items(), key=lambda x: x[1], reverse=True)
 
         # if leading teams are tied, nobody gets the winning bonus
         if list(scores)[0][1] == scores[1][1]:
