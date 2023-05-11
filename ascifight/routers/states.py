@@ -88,7 +88,18 @@ class RulesResponse(BaseModel):
     home_flag_required: bool = Field(
         description="Is the flag required to be at home to score?",
     )
-    actor_properties: list[data.ActorProperty]
+    capture_score: int = Field(
+        description="The number of points a team that captures a flag gets.",
+    )
+    kill_score: int = Field(
+        description="The number of points a team that kills an actor gets.",
+    )
+    winning_bonus: int = Field(
+        description="The additional bonus a team that is winning a game gets for overall scores.",
+    )
+    actor_properties: list[data.ActorProperty] = Field(
+        description="A list of actors and their properties describing which orders they can perform with what probability.",
+    )
 
 
 router = APIRouter(
@@ -150,6 +161,9 @@ async def get_game_rules() -> RulesResponse:
         map_size=config.config["game"]["map_size"],
         max_ticks=config.config["game"]["max_ticks"],
         max_score=config.config["game"]["max_score"],
+        capture_score=config.config["game"]["capture_score"],
+        kill_score=config.config["game"]["kill_score"],
+        winning_bonus=config.config["game"]["winning_bonus"],
         home_flag_required=config.config["game"]["home_flag_required"],
         actor_properties=actor_properties,
     )
