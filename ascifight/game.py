@@ -105,13 +105,17 @@ class Game:
         self,
         game_board: data.BoardData = data.BoardData(),
         score_file=config.config["server"]["scores_file"],
-        score_multiplier: int = config.config["game"]["score_multiplier"],
+        capture_score: int = config.config["game"]["capture_score"],
+        kill_score: int = config.config["game"]["kill_score"],
+        winning_bonus: int = config.config["game"]["winning_bonus"],
         max_ticks: int = config.config["game"]["max_ticks"],
         max_score: int = config.config["game"]["max_score"],
     ) -> None:
         self.logger = structlog.get_logger()
         self.score_file: str = score_file
-        self.score_multiplier: int = score_multiplier
+        self.capture_score: int = capture_score
+        self.kill_score: int = kill_score
+        self.winning_bonus: int = winning_bonus
 
         self.board = game_board
         self.board_actions = actions.BoardActions(self.board)
@@ -195,13 +199,15 @@ class Game:
 
     def _write_scores(self):
         game_scores = []
-        scores = list(self.scores.items())
-        scores = sorted(scores, key=lambda x: x[1], reverse=True)
-        if scores[0][1] == scores[1][1]:
-            tied_teams = [team for team, value in scores if value == scores[0][1]]
-            game_scores = [(team, 1 * self.score_multiplier) for team in tied_teams]
+        scores = sorted(self.scores.items(), reverse=True)
+
+        # if leading teams are tied, nobody gets the winning bonus
+        if list(scores)[0][1] == scores[1][1]:
+            game_scores = [(team, score) for team, score in scores]
         else:
-            game_scores = [(scores[0][0], 3 * self.score_multiplier)]
+            # leading team gets the winning bonus
+            game_scores = [(scores[0][0], scores[0][1] + self.winning_bonus)]
+            game_scores.extend([(team, score) for team, score in scores[1:]])
 
         with open(self.score_file, "a") as score_file:
             for score in game_scores:
@@ -242,11 +248,11 @@ class Game:
                 self.logger.warning(f"{actor} already moved this tick.")
             else:
                 # if the actor can move
-                already_moved[actor], team_that_scored = self.board_actions.move(
+                already_moved[actor], team_that_captured = self.board_actions.move(
                     actor, direction
                 )
-                if team_that_scored:
-                    self.scores[team_that_scored] += 1
+                if team_that_captured:
+                    self.scores[team_that_captured] += self.capture_score
 
         unbind_contextvars("team")
 
@@ -262,9 +268,11 @@ class Game:
             if already_attacked[actor]:
                 self.logger.warning(f"{actor} already attacked this tick.")
             else:
-                already_attacked[actor] = self.board_actions.attack(
+                already_attacked[actor], team_that_killed = self.board_actions.attack(
                     actor, order.direction
                 )
+                if team_that_killed:
+                    self.scores[team_that_killed] += self.kill_score
 
         unbind_contextvars("team")
 
@@ -279,10 +287,10 @@ class Game:
             if not already_grabbed[actor]:
                 (
                     already_grabbed[actor],
-                    team_that_scored,
+                    team_that_captured,
                 ) = self.board_actions.grabput_flag(actor, order.direction)
-                if team_that_scored:
-                    self.scores[team_that_scored] += 1
+                if team_that_captured:
+                    self.scores[team_that_captured] += self.capture_score
             else:
                 self.logger.warning(f"{actor} already grabbed this tick.")
         unbind_contextvars("team")

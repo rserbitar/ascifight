@@ -55,15 +55,18 @@ class BoardActions:
     def move(
         self, actor: data.Actor, direction: computations.Directions
     ) -> tuple[bool, None | data.Team]:
-        team_that_scored = None
+        team_that_captured = None
         new_coordinates = self.calc_target_coordinates(actor, direction)
         moved = self._try_put_actor(actor, new_coordinates)
         if moved:
-            team_that_scored = self._check_flag_return_conditions(actor)
-        return moved, team_that_scored
+            team_that_captured = self._check_flag_return_conditions(actor)
+        return moved, team_that_captured
 
-    def attack(self, actor: data.Actor, direction: computations.Directions) -> bool:
+    def attack(
+        self, actor: data.Actor, direction: computations.Directions
+    ) -> tuple[bool, None | data.Team]:
         attacked = False
+        team_that_killed = None
         if not actor.attack:
             self._logger.warning(f"{actor} can not attack.")
         else:
@@ -81,7 +84,8 @@ class BoardActions:
                 else:
                     self._logger.info(f"{actor} attacked and hit {target}.")
                     self._respawn(target)
-        return attacked
+                    team_that_killed = actor.team
+        return attacked, team_that_killed
 
     def build(self, actor: data.Actor, direction: computations.Directions) -> bool:
         built = False
@@ -133,7 +137,7 @@ class BoardActions:
     def grabput_flag(
         self, actor: data.Actor, direction: computations.Directions
     ) -> tuple[bool, None | data.Team]:
-        team_that_scored = None
+        team_that_captured = None
         target_coordinates = self.calc_target_coordinates(actor, direction)
 
         grab_successful = random.random() < actor.grab
@@ -161,7 +165,9 @@ class BoardActions:
                     target_actor.flag = flag
                     already_grabbed = True
                     self._logger.info(f"{actor} handed the flag to {target_actor}.")
-                    team_that_scored = self._check_flag_return_conditions(target_actor)
+                    team_that_captured = self._check_flag_return_conditions(
+                        target_actor
+                    )
 
             # no target actor, means empty field, wall or base (even a flag???)
             else:
@@ -176,7 +182,7 @@ class BoardActions:
                     self._logger.info(
                         f"{actor} put the flag to coordinates {target_coordinates}."
                     )
-                    team_that_scored = self._check_score_conditions(flag)
+                    team_that_captured = self._check_capture_conditions(flag)
 
         # the actor does not have the flag
         else:
@@ -199,32 +205,34 @@ class BoardActions:
                         )
                     else:
                         self._logger.info(f"{actor} grabbed the flag of {flag.team}.")
-                    team_that_scored = self._check_flag_return_conditions(actor=actor)
+                    team_that_captured = self._check_flag_return_conditions(actor=actor)
                 else:
                     self._logger.info(f"{actor} grabbed and missed the flag.")
 
-        return already_grabbed, team_that_scored
+        return already_grabbed, team_that_captured
 
-    def _check_score_conditions(
-        self, flag_to_score: data.Flag | None = None
+    def _check_capture_conditions(
+        self, flag_to_capture: data.Flag | None = None
     ) -> data.Team | None:
-        team_that_scored = None
+        team_that_captured = None
         flags = (
-            [flag_to_score]
-            if flag_to_score
+            [flag_to_capture]
+            if flag_to_capture
             else [flag for flag in self.board_data.flags_coordinates.keys()]
         )
-        for flag_to_score in flags:
-            score_flag_coordinates = self.board_data.flags_coordinates[flag_to_score]
+        for flag_to_capture in flags:
+            capture_flag_coordinates = self.board_data.flags_coordinates[
+                flag_to_capture
+            ]
             base_at_flag_coordinates = self.board_data.coordinates_bases.get(
-                score_flag_coordinates
+                capture_flag_coordinates
             )
             # if the flag is an enemy flag and owner flag is also there
             if (
                 # flag is on a base
                 base_at_flag_coordinates is not None
                 # flag is not on it own base
-                and (flag_to_score.team != base_at_flag_coordinates.team)
+                and (flag_to_capture.team != base_at_flag_coordinates.team)
             ):
                 scoring_team = base_at_flag_coordinates.team
                 # own flag is at base or this is not required
@@ -233,14 +241,14 @@ class BoardActions:
                     == self.board_data.bases_coordinates[data.Base(team=scoring_team)]
                 ) or (not self.config["game"]["home_flag_required"]):
                     self._logger.info(
-                        f"{scoring_team} scored {flag_to_score.team} flag!"
+                        f"{scoring_team} captured {flag_to_capture.team} flag!"
                     )
-                    team_that_scored = scoring_team
+                    team_that_captured = scoring_team
                     # return the flag to the base it belongs to
-                    self._return_flag_to_base(flag_to_score)
+                    self._return_flag_to_base(flag_to_capture)
                 else:
-                    self._logger.warning("Can not score, flag not at home.")
-        return team_that_scored
+                    self._logger.warning("Can not capture, flag not at home.")
+        return team_that_captured
 
     def _respawn(self, actor: data.Actor) -> None:
         base_coordinates = self.board_data.bases_coordinates[data.Base(team=actor.team)]
@@ -267,17 +275,17 @@ class BoardActions:
         ]
 
     def _check_flag_return_conditions(self, actor: data.Actor) -> data.Team | None:
-        team_that_scored = None
+        team_that_captured = None
         coordinates = self.board_data.actors_coordinates[actor]
         if coordinates in self.board_data.flags_coordinates.values():
             flag = self.board_data.coordinates_flags[coordinates]
             # if flag is own flag, return it to base
             if flag.team == actor.team:
                 self._return_flag_to_base(flag)
-                team_that_scored = self._check_score_conditions()
+                team_that_captured = self._check_capture_conditions()
                 if actor.flag:
                     actor.flag = None
-        return team_that_scored
+        return team_that_captured
 
     def _place_actor_in_area(
         self,

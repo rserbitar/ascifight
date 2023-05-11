@@ -129,7 +129,7 @@ async def get_game_state() -> StateResponse:
 
 @router.get("/scores")
 async def get_scores():
-    """Get the current state of the game including locations of all actors, flags, bases and walls."""
+    """Get the scores of the current game as well as all games in total."""
     return AllScores(
         scores=[
             Scores(team=team.name, score=score, color=util.color_names[team.number])
