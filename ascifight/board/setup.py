@@ -41,18 +41,6 @@ class BoardSetup:
         self.board_data.actor_classes = self.actor_classes
         self._place_board_objects()
 
-    @property
-    def _base_place_matrix(self):
-        return [
-            [[1, 4], [1, 4]],
-            [[1, 4], [self.map_size - 5, self.map_size - 2]],
-            [[self.map_size - 5, self.map_size - 2], [1, 4]],
-            [
-                [self.map_size - 5, self.map_size - 2],
-                [self.map_size - 5, self.map_size - 2],
-            ],
-        ]
-
     def _place_board_objects(self) -> None:
         self._place_bases_and_flags()
         for team in self.teams:
@@ -69,15 +57,22 @@ class BoardSetup:
         self._place_walls()
 
     def _place_bases_and_flags(self) -> None:
-        available_places = list(range(len(self._base_place_matrix)))
+        minimum_distance = int((self.map_size**2 / len(self.teams)) ** 0.5 / 1.2) - 1
+        available_places = [
+            data.Coordinates(x=i, y=j)
+            for i in range(2, self.map_size - 2)
+            for j in range(2, self.map_size - 2)
+        ]
+
         for team in self.teams:
             place_chosen = random.choice(available_places)
-            available_places.remove(place_chosen)
-            x = random.randint(*self._base_place_matrix[place_chosen][0])
-            y = random.randint(*self._base_place_matrix[place_chosen][1])
-            coordinates = data.Coordinates(x=x, y=y)
-            self.board_data.bases_coordinates[data.Base(team=team)] = coordinates
-            self.board_data.flags_coordinates[data.Flag(team=team)] = coordinates
+            available_places = [
+                i
+                for i in available_places
+                if i not in self._get_area_positions(place_chosen, minimum_distance)
+            ]
+            self.board_data.bases_coordinates[data.Base(team=team)] = place_chosen
+            self.board_data.flags_coordinates[data.Flag(team=team)] = place_chosen
 
     def _get_area_positions(
         self, center: data.Coordinates, distance: int
