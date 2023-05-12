@@ -1,29 +1,12 @@
 import httpx
-
-
-import enum
-import structlog
-import structlog.contextvars
+import logging
 import time
 
-logger = structlog.get_logger()
+logger = logging.getLogger()
 
 SERVER = "http://127.0.0.1:8000/"
 TEAM = "Team 1"
 PASSWORD = "1"
-
-
-class Orders(str, enum.Enum):
-    move = "move"
-    attack = "attack"
-    grabput = "grabput"
-
-
-class Directions(str, enum.Enum):
-    left = "left"
-    right = "right"
-    down = "down"
-    up = "up"
 
 
 def execute():
@@ -54,60 +37,54 @@ def execute():
             json={"origin": actor_coordinates, "target": target_coordinates},
         ).json()
         # we need to stop if we are standing right next to the base
-        if (
-            httpx.post(
-                url=f"{SERVER}computations/distance",
-                json={"origin": actor_coordinates, "target": target_coordinates},
-            ).json()
-            == 1
-        ):
+        if compute_distance(origin=actor_coordinates, target=target_coordinates) == 1:
             # and grab the flag, the direction is the one we would have walked to
-            httpx.post(
-                url=f"{SERVER}orders/grabput/{actor['ident']}",
-                params={"direction": direction},
-                auth=(TEAM, PASSWORD),
-            )
+            issue_order(order="grabput", actor_id=actor["ident"], direction=direction)
         # if we are not there yet we need to go
         else:
-            httpx.post(
-                url=f"{SERVER}orders/move/{actor['ident']}",
-                params={"direction": direction},
-                auth=(TEAM, PASSWORD),
-            )
+            issue_order(order="move", actor_id=actor["ident"], direction=direction)
     # if it has the flag we need to head home
     else:
         # where is home?
-        direction = httpx.post(
-            url=f"{SERVER}computations/direction",
-            json={"origin": actor_coordinates, "target": home_coordinates},
-        ).json()[0]
+        direction = compute_direction(
+            origin=actor_coordinates, target=home_coordinates
+        )[0]
+
         # if we are already just 1 space apart we are there
-        if (
-            httpx.post(
-                url=f"{SERVER}computations/distance",
-                json={"origin": actor_coordinates, "target": home_coordinates},
-            ).json()
-            == 1
-        ):
+        if compute_distance(origin=actor_coordinates, target=home_coordinates) == 1:
             # we put the flag on our base
-            httpx.post(
-                url=f"{SERVER}orders/grabput/{actor['ident']}",
-                params={"direction": direction},
-                auth=(TEAM, PASSWORD),
-            )
+            issue_order(order="grabput", actor_id=actor["ident"], direction=direction)
         else:
             # if we are not there we slog on home
-            httpx.post(
-                url=f"{SERVER}orders/move/{actor['ident']}",
-                params={"direction": direction},
-                auth=(TEAM, PASSWORD),
-            )
+            issue_order(order="move", actor_id=actor["ident"], direction=direction)
 
 
 def get_information(info_type: str):
     url = SERVER + "states/" + info_type
     response = httpx.get(url)
     return response.json()
+
+
+def compute_direction(origin, target) -> list[str]:
+    return httpx.post(
+        url=f"{SERVER}computations/direction",
+        json={"origin": origin, "target": target},
+    ).json()
+
+
+def compute_distance(origin, target) -> int:
+    return httpx.post(
+        url=f"{SERVER}computations/distance",
+        json={"origin": origin, "target": target},
+    ).json()
+
+
+def issue_order(order: str, actor_id: str, direction: str):
+    httpx.post(
+        url=f"{SERVER}orders/{order}/{actor_id}",
+        params={"direction": direction},
+        auth=(TEAM, PASSWORD),
+    )
 
 
 def game_loop():
@@ -120,17 +97,15 @@ def game_loop():
                 if timing["tick"] < current_tick:
                     # the game may have restarted, reset tick
                     current_tick = timing["tick"]
-                structlog.contextvars.bind_contextvars(tick=timing["tick"])
                 execute()
                 current_tick = timing["tick"]
-                logger.info("Issued orders for tick.")
+                logger.info(f"Issued orders for tick {current_tick}.")
             # sleep the time the server says it will take till next tick
             sleep_duration_time = timing["time_to_next_execution"]
-            logger.info("sleeping", seconds=sleep_duration_time)
+            logger.info(f"sleeping for {sleep_duration_time} seconds.")
             if sleep_duration_time >= 0:
                 time.sleep(sleep_duration_time)
         except httpx.ConnectError:
-            structlog.contextvars.unbind_contextvars("tick")
             logger.info("Server not started. Sleeping 5 seconds.")
             current_tick = -1
             time.sleep(5)
