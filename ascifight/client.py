@@ -32,10 +32,9 @@ def execute():
     # if it doesn't have the flag it needs to go to the enemy base
     if not actor["flag"]:
         # we can calculate the direction of the enemy base or get it from the server
-        direction = httpx.post(
-            url=f"{SERVER}computations/direction",
-            json={"origin": actor_coordinates, "target": target_coordinates},
-        ).json()
+        direction = compute_direction(
+            origin=actor_coordinates, target=target_coordinates
+        )[0]
         # we need to stop if we are standing right next to the base
         if compute_distance(origin=actor_coordinates, target=target_coordinates) == 1:
             # and grab the flag, the direction is the one we would have walked to
