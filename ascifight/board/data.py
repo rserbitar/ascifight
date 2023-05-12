@@ -2,6 +2,7 @@ import abc
 import sys
 import itertools
 import os
+import typing
 
 from pydantic import BaseModel, Field
 import toml
@@ -85,8 +86,8 @@ class Flag(BoardObject):
 class Actor(BoardObject, abc.ABC):
     ident: int
     team: Team
-    grab = 0.0
-    attack = 0.0
+    grab: typing.ClassVar[float] = 0.0
+    attack: typing.ClassVar[float] = 0.0
     build = 0.0
     destroy = 0.0
     flag: Flag | None = None
@@ -112,16 +113,16 @@ class Actor(BoardObject, abc.ABC):
 
 
 class Generalist(Actor):
-    grab = 1.0
-    attack = 1.0
+    grab: typing.ClassVar[float] = 1.0
+    attack: typing.ClassVar[float] = 1.0
 
 
 class Runner(Actor):
-    grab = 1.0
+    grab: typing.ClassVar[float] = 1.0
 
 
 class Attacker(Actor):
-    attack = 1.0
+    attack: typing.ClassVar[float] = 1.0
 
 
 class Guardian(Actor):
