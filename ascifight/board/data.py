@@ -63,6 +63,10 @@ class ActorProperty(BaseModel):
     attack: float = Field(
         description="The probability to successfully attack. An actor with 0 can not attack.",
     )
+    build: float = Field(description="The probability to successfully build a wall. ")
+    destroy: float = Field(
+        description="The probability to successfully destroy a wall."
+    )
 
 
 class BoardObject(BaseModel, abc.ABC):
@@ -109,7 +113,13 @@ class Actor(BoardObject, abc.ABC):
 
     @classmethod
     def get_properties(cls) -> ActorProperty:
-        return ActorProperty(type=cls.__name__, grab=cls.grab, attack=cls.attack)
+        return ActorProperty(
+            type=cls.__name__,
+            grab=cls.grab,
+            attack=cls.attack,
+            build=cls.build,
+            destroy=cls.destroy,
+        )
 
 
 class Generalist(Actor):
