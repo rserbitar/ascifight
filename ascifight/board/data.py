@@ -88,8 +88,8 @@ class Actor(BoardObject, abc.ABC):
     team: Team
     grab: typing.ClassVar[float] = 0.0
     attack: typing.ClassVar[float] = 0.0
-    build = 0.0
-    destroy = 0.0
+    build: typing.ClassVar[float] = 0.0
+    destroy: typing.ClassVar[float] = 0.0
     flag: Flag | None = None
 
     def __str__(self):
@@ -130,11 +130,11 @@ class Guardian(Actor):
 
 
 class Builder(Actor):
-    build = 0.2
+    build: typing.ClassVar[float] = 0.2
 
 
 class Destroyer(Actor):
-    destroy = 0.25
+    destroy: typing.ClassVar[float] = 0.25
 
 
 class Base(BoardObject):
