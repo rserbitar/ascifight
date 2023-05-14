@@ -33,6 +33,8 @@ class AsciFight3D:
         vpython.scene.width = 800
         vpython.scene.height = 800
         vpython.scene.resizable = True
+        vpython.distant_light(direction=vpython.vector(0, 1, 0))
+        vpython.distant_light(direction=vpython.vector(0, -1, 0))
 
     def team_index(self, team):
         index = self.state['teams'].index(team)
@@ -97,7 +99,8 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
         for x in range(map_size):
             for y in range(map_size):
                 new_square = vpython.box(pos=vpython.vector(x, y, 0), length=1, width=0.1, height=1,
-                                         color=(vpython.color.white, vpython.color.black)[(x + y) % 2])
+                                         color=(vpython.color.white, vpython.color.gray(luminance=0.2))[(x + y) % 2],
+                                         texture=vpython.textures.granite)
                 self.static_vobjects[f'square_{x}_{y}'] = new_square
             new_text_x = vpython.text(pos=vpython.vector(x - 0.4, -1, 0), align='left', color=vpython.color.white,
                                       height=0.8, depth=0.1, text=str(x), axis=vpython.vector(0, -1, 0))
@@ -141,16 +144,18 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
 
     def new_base(self, pos, color):
         return vpython.cylinder(pos=pos, axis=vpython.vector(0, 0, 0.5), radius=0.45,
-                                color=color)
+                                color=color, texture=vpython.textures.wood)
 
     def new_runner(self, pos, color):
-        return vpython.cone(pos=pos, color=color, radius=0.3, axis=vpython.vector(0, 0, 1))
+        return vpython.cone(pos=pos, color=color, radius=0.45, axis=vpython.vector(0, 0, 1.5),
+                            texture=vpython.textures.metal)
 
     def new_flag(self, pos, color):
         handle = vpython.cylinder(color=vpython.vector(0.72, 0.42, 0), axis=vpython.vector(0, 0, 3), radius=0.05,
                                   pos=pos)
         head = vpython.box(color=color, pos=pos + vpython.vector(0.45, 0, 3), length=1, width=0.7, height=0.1)
-        flag = vpython.compound([handle, head], origin=pos)
+        flag = vpython.compound([handle, head], origin=pos, texture=vpython.textures.rug)
+
         return flag
 
     def new_wall(self, pos, color):
