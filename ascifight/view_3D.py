@@ -134,31 +134,38 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
         pos = self.coordinates_to_vector(game_object['coordinates'])
         if not self.move_vobject(v_id, pos):
             color = self.team_to_color(game_object['team'])
-            self.dynamic_vobjects[v_id] = drawer(pos, color)
+            self.dynamic_vobjects[v_id] = drawer(pos, color, game_object)
 
     def teleport_or_create(self, v_id, game_object, drawer):
         pos = self.coordinates_to_vector(game_object['coordinates'])
         if not self.teleport_vobject(v_id, pos):
             color = self.team_to_color(game_object['team'])
-            self.dynamic_vobjects[v_id] = drawer(pos, color)
+            self.dynamic_vobjects[v_id] = drawer(pos, color, game_object)
 
-    def new_base(self, pos, color):
-        return vpython.cylinder(pos=pos, axis=vpython.vector(0, 0, 0.5), radius=0.45,
-                                color=color, texture=vpython.textures.wood)
+    def new_base(self, pos, color, game_object):
+        return vpython.cone(pos=pos, radius=0.45, axis=vpython.vector(0, 0, 1.5),
+                            color=color, texture=vpython.textures.wood)
 
-    def new_runner(self, pos, color):
-        return vpython.cone(pos=pos, color=color, radius=0.45, axis=vpython.vector(0, 0, 1.5),
-                            texture=vpython.textures.metal)
+    def new_runner(self, pos, color, game_object):
+        cylinder = vpython.cylinder(pos=pos, color=color, radius=0.45, axis=vpython.vector(0, 0, .5),
+                                    texture=vpython.textures.metal)
+        return cylinder
 
-    def new_flag(self, pos, color):
+    def new_number(self, pos, color, game_object):
+        # This produces ugly and hacky text. For some reason, text objects freak out when even near a compund,
+        # thus we have to make due without
+        number = vpython.text(text=str(game_object['ident']), pos=pos,
+                              depth=0.55, color=vpython.color.black, height=0.4, align='center')
+        return number
+
+    def new_flag(self, pos, color, game_object):
         handle = vpython.cylinder(color=vpython.vector(0.72, 0.42, 0), axis=vpython.vector(0, 0, 3), radius=0.05,
                                   pos=pos)
         head = vpython.box(color=color, pos=pos + vpython.vector(0.45, 0, 3), length=1, width=0.7, height=0.1)
         flag = vpython.compound([handle, head], origin=pos, texture=vpython.textures.rug)
-
         return flag
 
-    def new_wall(self, pos, color):
+    def new_wall(self, pos, color, game_object):
         box = vpython.box(color=vpython.color.orange, pos=pos + vpython.vector(0, 0, 0.5), height=1, width=1, length=1,
                           )
         wall = vpython.compound([box], origin=pos, texture=vpython.textures.rock)
@@ -177,6 +184,8 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
             v_id = f'{actor_type}_{index1}_{index2}'
             draw_function = self.actor_drawer[actor_type]
             self.move_or_create(v_id, actor, draw_function)
+            v_id = f'{actor_type}_{index1}_{index2}_number'
+            self.move_or_create(v_id, actor, self.new_number)
 
     def draw_flags(self):
         for i, flag in enumerate(self.state['flags']):
