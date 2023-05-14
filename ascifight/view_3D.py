@@ -32,6 +32,7 @@ class AsciFight3D:
 
         vpython.scene.width = 800
         vpython.scene.height = 800
+        vpython.scene.resizable = True
 
     def team_index(self, team):
         index = self.state['teams'].index(team)
@@ -80,6 +81,7 @@ class AsciFight3D:
         vpython.scene.caption = f"""Current score: {self.state['scores']}. 
 Current tick: {self.timing['tick']} 
 
+Drag sides or bottem right corner to resize view.
 To rotate "camera", drag with right button or Ctrl-drag.
 To zoom, drag with middle button or Alt/Option depressed, or use scroll wheel.
 On a two-button mouse, middle is left + right.
