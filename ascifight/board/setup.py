@@ -105,4 +105,4 @@ class BoardSetup:
         all_positions = {data.Coordinates(x=i[0], y=i[1]) for i in all_combinations}
         possible_coordinates = list(all_positions - forbidden_positions)
         random.shuffle(possible_coordinates)
-        self.walls_coordinates = set(possible_coordinates[: self.walls])
+        self.board_data.walls_coordinates = set(possible_coordinates[: self.walls])
