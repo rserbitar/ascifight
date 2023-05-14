@@ -73,7 +73,7 @@ class AsciFight3D:
             del self.static_vobjects[ref]
         for ref, vobject in list(self.dynamic_vobjects.items()):
             vobject.visible = False
-            del self.static_vobjects[ref]
+            del self.dynamic_vobjects[ref]
         self.initialize_board()
 
     def set_caption(self):
