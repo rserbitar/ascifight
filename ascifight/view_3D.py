@@ -134,7 +134,7 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
     def new_flag(self, pos, color):
         handle = vpython.cylinder(color=vpython.vector(0.72, 0.42, 0), axis=vpython.vector(0, 0, 3), radius=0.05,
                                   pos=pos)
-        head = vpython.box(color=color, pos=pos + vpython.vector(0, 0.5, 3), length=0.1, width=1, height=1)
+        head = vpython.box(color=color, pos=pos + vpython.vector(0.45, 0, 3), length=1, width=0.7, height=0.1)
         flag = vpython.compound([handle, head], origin=pos)
         return flag
 
