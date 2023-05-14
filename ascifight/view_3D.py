@@ -39,6 +39,8 @@ class AsciFight3D:
         return index
 
     def team_to_color(self, team):
+        if team is None:
+            return None
         index = self.team_index(team)
         color_name = ascifight.util.color_names[index]
         return getattr(vpython.color, color_name)
@@ -114,6 +116,13 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
             return True
         return False
 
+    def teleport_vobject(self, object_id, pos):
+        if object_id in self.dynamic_vobjects:
+            self.dynamic_vobjects[object_id].pos = pos
+            self.dynamic_vobjects[object_id].ascifight_update = True
+            return True
+        return False
+
     @staticmethod
     def coordinates_to_vector(coordinates):
         return vpython.vector(coordinates['x'], coordinates['y'], 0)
@@ -121,6 +130,12 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
     def move_or_create(self, v_id, game_object, drawer):
         pos = self.coordinates_to_vector(game_object['coordinates'])
         if not self.move_vobject(v_id, pos):
+            color = self.team_to_color(game_object['team'])
+            self.dynamic_vobjects[v_id] = drawer(pos, color)
+
+    def teleport_or_create(self, v_id, game_object, drawer):
+        pos = self.coordinates_to_vector(game_object['coordinates'])
+        if not self.teleport_vobject(v_id, pos):
             color = self.team_to_color(game_object['team'])
             self.dynamic_vobjects[v_id] = drawer(pos, color)
 
@@ -137,6 +152,12 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
         head = vpython.box(color=color, pos=pos + vpython.vector(0.45, 0, 3), length=1, width=0.7, height=0.1)
         flag = vpython.compound([handle, head], origin=pos)
         return flag
+
+    def new_wall(self, pos, color):
+        box = vpython.box(color=vpython.color.orange, pos=pos + vpython.vector(0, 0, 0.5), height=1, width=1, length=1,
+                          )
+        wall = vpython.compound([box], origin=pos, texture=vpython.textures.rock)
+        return wall
 
     def draw_bases(self):
         for i, base in enumerate(self.state['bases']):
@@ -157,12 +178,19 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
             v_id = f'flag_{i}'
             self.move_or_create(v_id, flag, self.new_flag)
 
+    def draw_walls(self):
+        for i, wall in enumerate(self.state['walls']):
+            v_id = f'wall_{i}'
+            wall_object = {'coordinates': wall, 'team': None}
+            self.teleport_or_create(v_id, wall_object, self.new_wall)
+
     def update(self):
         self.new_step()
         print(self.state)
         self.draw_bases()
         self.draw_actors()
         self.draw_flags()
+        self.draw_walls()
         self.animate()
         self.cleanup()
 
