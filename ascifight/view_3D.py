@@ -81,6 +81,16 @@ class AsciFight3D:
             del self.dynamic_vobjects[ref]
         self.initialize_board()
 
+    def fix_text_alignment_errors(self):
+        """
+        For an unknown reason, vpython.text flips out if the last created compound had an origin other than (0,0,0)
+        and totally botches the texts position. Thus, before we create any new texts, we create this invisible
+        compound that we then delete immediately. This somehow fixes the issue.
+        """
+        error_fix_box = vpython.box(size=vpython.vector(0.1, 0.1, 0.1))
+        error_fix_compund = vpython.compound([error_fix_box], visible=False, origin=vpython.vector(0, 0, 0))
+        del error_fix_compund
+
     def set_caption(self):
         vpython.scene.caption = f"""Current score: {self.state['scores']}. 
 Current tick: {self.timing['tick']} 
@@ -94,6 +104,7 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
 
     def initialize_board(self):
         self.new_step()
+        self.fix_text_alignment_errors()
         map_size = self.rules['map_size']
         vpython.scene.center = vpython.vector(map_size / 2, map_size / 2, 0)
         for x in range(map_size):
@@ -147,16 +158,13 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
                             color=color, texture=vpython.textures.wood)
 
     def new_runner(self, pos, color, game_object):
+        self.fix_text_alignment_errors()
         cylinder = vpython.cylinder(pos=pos, color=color, radius=0.45, axis=vpython.vector(0, 0, .5),
-                                    texture=vpython.textures.metal)
-        return cylinder
-
-    def new_number(self, pos, color, game_object):
-        # This produces ugly and hacky text. For some reason, text objects freak out when even near a compund,
-        # thus we have to make due without
-        number = vpython.text(text=str(game_object['ident']), pos=pos,
+                                    )
+        number = vpython.text(text=str(game_object['ident']), pos=pos + vpython.vector(0, -0.2, 0),
                               depth=0.55, color=vpython.color.black, height=0.4, align='center')
-        return number
+        runner = vpython.compound([cylinder, number], texture=vpython.textures.metal, origin=pos)
+        return runner
 
     def new_flag(self, pos, color, game_object):
         handle = vpython.cylinder(color=vpython.vector(0.72, 0.42, 0), axis=vpython.vector(0, 0, 3), radius=0.05,
@@ -184,8 +192,6 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
             v_id = f'{actor_type}_{index1}_{index2}'
             draw_function = self.actor_drawer[actor_type]
             self.move_or_create(v_id, actor, draw_function)
-            v_id = f'{actor_type}_{index1}_{index2}_number'
-            self.move_or_create(v_id, actor, self.new_number)
 
     def draw_flags(self):
         for i, flag in enumerate(self.state['flags']):
