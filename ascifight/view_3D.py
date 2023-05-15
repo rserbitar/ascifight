@@ -119,6 +119,12 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
                                       height=0.8, depth=0.1, text=str(x))
             self.static_vobjects[f'label_x_{x}'] = new_text_x
             self.static_vobjects[f'label_y_{x}'] = new_text_y
+        label_x = vpython.text(pos=vpython.vector(map_size, -2, 0), align='left', color=vpython.color.white,
+                               height=0.8, depth=0.1, text='X')
+        label_y = vpython.text(pos=vpython.vector(-1, map_size, 0), align='right', color=vpython.color.white,
+                               height=0.8, depth=0.1, text='Y')
+        self.static_vobjects[f'label_x'] = label_x
+        self.static_vobjects[f'label_y'] = label_y
 
     def move_vobject(self, object_id, pos):
         if object_id in self.dynamic_vobjects:
