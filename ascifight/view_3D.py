@@ -32,12 +32,17 @@ class AsciFight3D:
 
         vpython.scene.width = 800
         vpython.scene.height = 800
+        vpython.scene.resizable = True
+        vpython.distant_light(direction=vpython.vector(0, 1, 0))
+        vpython.distant_light(direction=vpython.vector(0, -1, 0))
 
     def team_index(self, team):
         index = self.state['teams'].index(team)
         return index
 
     def team_to_color(self, team):
+        if team is None:
+            return None
         index = self.team_index(team)
         color_name = ascifight.util.color_names[index]
         return getattr(vpython.color, color_name)
@@ -73,13 +78,24 @@ class AsciFight3D:
             del self.static_vobjects[ref]
         for ref, vobject in list(self.dynamic_vobjects.items()):
             vobject.visible = False
-            del self.static_vobjects[ref]
+            del self.dynamic_vobjects[ref]
         self.initialize_board()
+
+    def fix_text_alignment_errors(self):
+        """
+        For an unknown reason, vpython.text flips out if the last created compound had an origin other than (0,0,0)
+        and totally botches the texts position. Thus, before we create any new texts, we create this invisible
+        compound that we then delete immediately. This somehow fixes the issue.
+        """
+        error_fix_box = vpython.box(size=vpython.vector(0.1, 0.1, 0.1))
+        error_fix_compund = vpython.compound([error_fix_box], visible=False, origin=vpython.vector(0, 0, 0))
+        del error_fix_compund
 
     def set_caption(self):
         vpython.scene.caption = f"""Current score: {self.state['scores']}. 
 Current tick: {self.timing['tick']} 
 
+Drag sides or bottem right corner to resize view.
 To rotate "camera", drag with right button or Ctrl-drag.
 To zoom, drag with middle button or Alt/Option depressed, or use scroll wheel.
 On a two-button mouse, middle is left + right.
@@ -88,12 +104,14 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
 
     def initialize_board(self):
         self.new_step()
+        self.fix_text_alignment_errors()
         map_size = self.rules['map_size']
         vpython.scene.center = vpython.vector(map_size / 2, map_size / 2, 0)
         for x in range(map_size):
             for y in range(map_size):
                 new_square = vpython.box(pos=vpython.vector(x, y, 0), length=1, width=0.1, height=1,
-                                         color=(vpython.color.white, vpython.color.black)[(x + y) % 2])
+                                         color=(vpython.color.white, vpython.color.gray(luminance=0.2))[(x + y) % 2],
+                                         texture=vpython.textures.granite)
                 self.static_vobjects[f'square_{x}_{y}'] = new_square
             new_text_x = vpython.text(pos=vpython.vector(x - 0.4, -1, 0), align='left', color=vpython.color.white,
                                       height=0.8, depth=0.1, text=str(x), axis=vpython.vector(0, -1, 0))
@@ -101,6 +119,12 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
                                       height=0.8, depth=0.1, text=str(x))
             self.static_vobjects[f'label_x_{x}'] = new_text_x
             self.static_vobjects[f'label_y_{x}'] = new_text_y
+        label_x = vpython.text(pos=vpython.vector(map_size, -2, 0), align='left', color=vpython.color.white,
+                               height=0.8, depth=0.1, text='X')
+        label_y = vpython.text(pos=vpython.vector(-1, map_size, 0), align='right', color=vpython.color.white,
+                               height=0.8, depth=0.1, text='Y')
+        self.static_vobjects[f'label_x'] = label_x
+        self.static_vobjects[f'label_y'] = label_y
 
     def move_vobject(self, object_id, pos):
         if object_id in self.dynamic_vobjects:
@@ -108,6 +132,13 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
             if old_pos != pos:
                 dpos = (pos - old_pos) / self.animation_steps
                 self.animations[object_id] = (dpos, pos)
+            self.dynamic_vobjects[object_id].ascifight_update = True
+            return True
+        return False
+
+    def teleport_vobject(self, object_id, pos):
+        if object_id in self.dynamic_vobjects:
+            self.dynamic_vobjects[object_id].pos = pos
             self.dynamic_vobjects[object_id].ascifight_update = True
             return True
         return False
@@ -120,21 +151,42 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
         pos = self.coordinates_to_vector(game_object['coordinates'])
         if not self.move_vobject(v_id, pos):
             color = self.team_to_color(game_object['team'])
-            self.dynamic_vobjects[v_id] = drawer(pos, color)
+            self.dynamic_vobjects[v_id] = drawer(pos, color, game_object)
 
-    def new_base(self, pos, color):
-        return vpython.cylinder(pos=pos, axis=vpython.vector(0, 0, 0.5), radius=0.45,
-                                color=color)
+    def teleport_or_create(self, v_id, game_object, drawer):
+        pos = self.coordinates_to_vector(game_object['coordinates'])
+        if not self.teleport_vobject(v_id, pos):
+            color = self.team_to_color(game_object['team'])
+            self.dynamic_vobjects[v_id] = drawer(pos, color, game_object)
 
-    def new_runner(self, pos, color):
-        return vpython.cone(pos=pos, color=color, radius=0.3, axis=vpython.vector(0, 0, 1))
+    def new_base(self, pos, color, game_object):
+        return vpython.cone(pos=pos, radius=0.45, axis=vpython.vector(0, 0, 1.5),
+                            color=color,
+                            texture={'file': vpython.textures.wood_old, 'bumpmap': vpython.bumpmaps.wood_old})
 
-    def new_flag(self, pos, color):
+    def new_runner(self, pos, color, game_object):
+        self.fix_text_alignment_errors()
+        cylinder = vpython.cylinder(pos=pos, color=color, radius=0.45, axis=vpython.vector(0, 0, .5),
+                                    )
+        number = vpython.text(text=str(game_object['ident']), pos=pos + vpython.vector(0, -0.2, 0),
+                              depth=0.55, color=vpython.color.black, height=0.4, align='center')
+        runner = vpython.compound([cylinder, number], origin=pos,
+                                  texture={'file': vpython.textures.metal, 'bumpmap': vpython.bumpmaps.stucco})
+        return runner
+
+    def new_flag(self, pos, color, game_object):
         handle = vpython.cylinder(color=vpython.vector(0.72, 0.42, 0), axis=vpython.vector(0, 0, 3), radius=0.05,
                                   pos=pos)
-        head = vpython.box(color=color, pos=pos + vpython.vector(0, 0.5, 3), length=0.1, width=1, height=1)
-        flag = vpython.compound([handle, head], origin=pos)
+        head = vpython.box(color=color, pos=pos + vpython.vector(0.45, 0, 3), length=1, width=0.7, height=0.1)
+        flag = vpython.compound([handle, head], origin=pos, texture=vpython.textures.rug)
         return flag
+
+    def new_wall(self, pos, color, game_object):
+        box = vpython.box(color=vpython.color.gray(luminance=0.4), pos=pos + vpython.vector(0, 0, 0.5),
+                          height=1, width=1, length=1)
+        wall = vpython.compound([box], origin=pos,
+                                texture={'file': vpython.textures.rock, 'bumpmap': vpython.bumpmaps.rock})
+        return wall
 
     def draw_bases(self):
         for i, base in enumerate(self.state['bases']):
@@ -155,12 +207,19 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
             v_id = f'flag_{i}'
             self.move_or_create(v_id, flag, self.new_flag)
 
+    def draw_walls(self):
+        for i, wall in enumerate(self.state['walls']):
+            v_id = f'wall_{i}'
+            wall_object = {'coordinates': wall, 'team': None}
+            self.teleport_or_create(v_id, wall_object, self.new_wall)
+
     def update(self):
         self.new_step()
         print(self.state)
         self.draw_bases()
         self.draw_actors()
         self.draw_flags()
+        self.draw_walls()
         self.animate()
         self.cleanup()
 
