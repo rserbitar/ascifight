@@ -155,7 +155,8 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
 
     def new_base(self, pos, color, game_object):
         return vpython.cone(pos=pos, radius=0.45, axis=vpython.vector(0, 0, 1.5),
-                            color=color, texture=vpython.textures.wood)
+                            color=color,
+                            texture={'file': vpython.textures.wood_old, 'bumpmap': vpython.bumpmaps.wood_old})
 
     def new_runner(self, pos, color, game_object):
         self.fix_text_alignment_errors()
@@ -163,7 +164,8 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
                                     )
         number = vpython.text(text=str(game_object['ident']), pos=pos + vpython.vector(0, -0.2, 0),
                               depth=0.55, color=vpython.color.black, height=0.4, align='center')
-        runner = vpython.compound([cylinder, number], texture=vpython.textures.metal, origin=pos)
+        runner = vpython.compound([cylinder, number], origin=pos,
+                                  texture={'file': vpython.textures.metal, 'bumpmap': vpython.bumpmaps.stucco})
         return runner
 
     def new_flag(self, pos, color, game_object):
@@ -174,9 +176,10 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
         return flag
 
     def new_wall(self, pos, color, game_object):
-        box = vpython.box(color=vpython.color.orange, pos=pos + vpython.vector(0, 0, 0.5), height=1, width=1, length=1,
-                          )
-        wall = vpython.compound([box], origin=pos, texture=vpython.textures.rock)
+        box = vpython.box(color=vpython.color.gray(luminance=0.4), pos=pos + vpython.vector(0, 0, 0.5),
+                          height=1, width=1, length=1)
+        wall = vpython.compound([box], origin=pos,
+                                texture={'file': vpython.textures.rock, 'bumpmap': vpython.bumpmaps.rock})
         return wall
 
     def draw_bases(self):
