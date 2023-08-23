@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
+from pydantic import BaseModel, Field
 
 import ascifight.config as config
 import ascifight.globals as globals
@@ -55,18 +56,23 @@ direction_annotation = Annotated[
     ),
 ]
 
+
+class OrderResponse(BaseModel):
+    message: str = Field(description="Order response message")
+
+
 router = APIRouter(
     prefix="/orders",
     tags=["orders"],
 )
 
 
-@router.post("/move/{actor}")
+@router.post("/move/{actor}", status_code=202)
 async def move_order(
     team: Annotated[str, Depends(get_current_team)],
     actor: actor_annotation,
     direction: direction_annotation,
-) -> dict[str, str]:
+) -> OrderResponse:
     """With a move order you can move around any of your _actors_, by exactly one field in any non-diagonal direction.
 
     It is not allowed to step on fields:
@@ -79,15 +85,15 @@ async def move_order(
     """
     order = game.MoveOrder(team=team, actor=actor, direction=direction)
     globals.command_queue.put_nowait(order)
-    return {"message": "Move order added."}
+    return OrderResponse(message="Move order added.")
 
 
-@router.post("/grabput/{actor}")
+@router.post("/grabput/{actor}", status_code=202)
 async def grabput_order(
     team: Annotated[str, Depends(get_current_team)],
     actor: actor_annotation,
     direction: direction_annotation,
-) -> dict[str, str]:
+) -> OrderResponse:
     """If an _actor_ does not have the flag, it can grab it with this order. Give it a direction from its current position and it will try to grab
     the _flag_ from the target field, even from another _actor_.
 
@@ -101,15 +107,15 @@ async def grabput_order(
     """
     order = game.GrabPutOrder(team=team, actor=actor, direction=direction)
     globals.command_queue.put_nowait(order)
-    return {"message": "Grabput order added."}
+    return OrderResponse(message="Grabput order added.")
 
 
-@router.post("/attack/{actor}")
+@router.post("/attack/{actor}", status_code=202)
 async def attack_order(
     team: Annotated[str, Depends(get_current_team)],
     actor: actor_annotation,
     direction: direction_annotation,
-) -> dict[str, str]:
+) -> OrderResponse:
     """With attack orders you can force other actors, even your own, to respawn near their base. Just hit them and they are gone.
 
     Attack actions affect exactly one space in the direction of the attack. They only have a certain probability to work.
@@ -119,15 +125,15 @@ async def attack_order(
     Only _actors_ with a non-zero _attack_ property can _attack_."""
     order = game.AttackOrder(team=team, actor=actor, direction=direction)
     globals.command_queue.put_nowait(order)
-    return {"message": "Attack order added."}
+    return OrderResponse(message="Attack order added.")
 
 
-@router.post("/destroy/{actor}")
+@router.post("/destroy/{actor}", status_code=202)
 async def destroy_order(
     team: Annotated[str, Depends(get_current_team)],
     actor: actor_annotation,
     direction: direction_annotation,
-) -> dict[str, str]:
+) -> OrderResponse:
     """Destroy orders you can remove those pesky walls. Just walk up to them and target the next wall with a destroy order.
 
 
@@ -136,15 +142,15 @@ async def destroy_order(
     Only _actors_ with a non-zero _destroy_ property can _destroy_."""
     order = game.DestroyOrder(team=team, actor=actor, direction=direction)
     globals.command_queue.put_nowait(order)
-    return {"message": "Destroy order added."}
+    return OrderResponse(message="Destroy order added.")
 
 
-@router.post("/build/{actor}")
+@router.post("/build/{actor}", status_code=202)
 async def build_order(
     team: Annotated[str, Depends(get_current_team)],
     actor: actor_annotation,
     direction: direction_annotation,
-) -> dict[str, str]:
+) -> OrderResponse:
     """Build orders can get you more walls where you want them. Walk next to the location where you want a wall and then start building.
 
 
@@ -153,4 +159,4 @@ async def build_order(
     Only _actors_ with a non-zero _build_ property can _build_."""
     order = game.BuildOrder(team=team, actor=actor, direction=direction)
     globals.command_queue.put_nowait(order)
-    return {"message": "Build order added."}
+    return OrderResponse(message="Build order added.")
