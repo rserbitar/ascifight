@@ -234,7 +234,7 @@ func main() {
 			state := game_state()
 			orders := generate_orders(state)
 			submit_orders(orders)
-			log.Printf("state recieved: %v", state)
+			log.Printf("state received: %v", state)
 		}
 
 	}

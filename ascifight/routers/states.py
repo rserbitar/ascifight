@@ -67,7 +67,7 @@ class StateResponse(BaseModel):
 
 class TimingResponse(BaseModel):
     tick: int = Field(description="The last game tick.")
-    time_to_next_execution: datetime.timedelta = Field(
+    time_to_next_execution: float = Field(
         description="The time to next execution in seconds."
     )
     time_of_next_execution: datetime.datetime = Field(
@@ -174,6 +174,8 @@ async def get_timing() -> TimingResponse:
     """Get the current tick and time of next execution. If current tick is 0, game has not yet started."""
     return TimingResponse(
         tick=globals.my_game.tick,
-        time_to_next_execution=globals.time_of_next_execution - datetime.datetime.now(),
+        time_to_next_execution=(
+            globals.time_of_next_execution - datetime.datetime.now()
+        ).total_seconds(),
         time_of_next_execution=globals.time_of_next_execution,
     )

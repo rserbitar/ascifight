@@ -13,10 +13,11 @@ def execute():
     # put your execution code here
     state = get_information("game_state")
     teams = state["teams"].copy()
+    # remove our own team from the teams to target
     teams.remove(TEAM)
     # this teams flag we want to get
     target_team = teams[0]
-    # this is the base we need to go to, suppose their flag is there?
+    # this is the base we need to go to, assuming their flag is there?
     target_base = [base for base in state["bases"] if base["team"] == target_team][0]
     # these are the bases coordinates
     target_coordinates = target_base["coordinates"]
@@ -25,7 +26,7 @@ def execute():
     # we need the coordinates when we want to go home
     home_coordinates = home_base["coordinates"]
     # we will just use the first of our actors we have
-    # suppose that it will be able to grab the flag
+    # assuming that it will be able to grab the flag
     actor = [actor for actor in state["actors"] if actor["team"] == TEAM][0]
     # thats where the actor currently is
     actor_coordinates = actor["coordinates"]
