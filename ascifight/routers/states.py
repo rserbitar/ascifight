@@ -95,10 +95,16 @@ class RulesResponse(BaseModel):
         description="The number of points a team that kills an actor gets.",
     )
     winning_bonus: int = Field(
-        description="The additional bonus a team that is winning a game gets for overall scores.",
+        description=(
+            "The additional bonus a team that is winning a game gets for overall "
+            "scores."
+        ),
     )
     actor_properties: list[data.ActorProperty] = Field(
-        description="A list of actors and their properties describing which orders they can perform with what probability.",
+        description=(
+            "A list of actors and their properties describing which orders "
+            "they can perform with what probability."
+        ),
     )
 
 
@@ -110,7 +116,8 @@ router = APIRouter(
 
 @router.get("/game_state")
 async def get_game_state() -> StateResponse:
-    """Get the current state of the game including locations of all actors, flags, bases and walls."""
+    """Get the current state of the game including locations of all actors,
+    flags, bases and walls."""
     return StateResponse(
         teams=[team.name for team in globals.my_game.board.teams],
         actors=[
@@ -171,7 +178,8 @@ async def get_game_rules() -> RulesResponse:
 
 @router.get("/timing")
 async def get_timing() -> TimingResponse:
-    """Get the current tick and time of next execution. If current tick is 0, game has not yet started."""
+    """Get the current tick and time of next execution. If current tick is 0,
+    game has not yet started."""
     return TimingResponse(
         tick=globals.my_game.tick,
         time_to_next_execution=(

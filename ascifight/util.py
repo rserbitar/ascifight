@@ -105,24 +105,28 @@ color_rgb_mapping = {
 api_description = """
 **ASCI-Fight** allows you to fight with your teammates in style.
 
-The goal of this game is to score as many points as possible by capturing your enemies flags. Go to your enemies bases, 
-grab the flags and put them on top of your own base.Any enemies that try to stop you, you can attack. Of course they will 
+The goal of this game is to score as many points as possible by capturing your 
+enemies flags. Go to your enemies bases,  grab the flags and put them on top of 
+your own base.Any enemies that try to stop you, you can attack. Of course they will 
 respawn, but the won't bother you in the next ticks.
 
 Show your coding prowess by creating the best scripts and dominate your co-workers!
 
 ## The Game 
 
-You control a couple of actors with different properties to rule the field of battle. Depending on their properties they 
-can perform various orders for you. Once the server is up (which must be the case, because you can read this documentation)
-there is a grace period before the game starts. Once it has started you can give orders for a certain time, then all orders are 
-executed at once and the game is waiting for the next orders.
+You control a couple of actors with different properties to rule the field of battle.
+Depending on their properties they can perform various orders for you. Once the
+server is up (which must be the case, because you can read this documentation) there 
+is a grace period before the game starts. Once it has started you can give orders for 
+a certain time, then all orders are executed at once and the game is waiting for the 
+next orders.
 
 
 The _game_start_ service tells you when the next game is starting.
 
 
-The game ends after a certain number of points were scored or a certain number of ticks have passed.
+The game ends after a certain number of points were scored or a certain number of 
+ticks have passed.
 
 ## Components
 
@@ -130,15 +134,20 @@ Whats in the game you ask? Easy!
 
 ### Actors
 
-Actors are your minions you move over the field of battle. They have different properties like _grab_ and _attack_. The can perform _orders_ to move, attack and grab.
+Actors are your minions you move over the field of battle. They have different 
+properties like _grab_ and _attack_. The can perform _orders_ to move, attack and 
+grab.
 
 ### Bases
 
-Each team has one. Thats where your actor start, where your flag sits and were both your actors and your flag return when they are killed or the flag is scored by an enemy team.
+Each team has one. Thats where your actor start, where your flag sits and were both 
+your actors and your flag return when they are killed or the flag is scored by an 
+enemy team.
 
 ### Flags
 
-There is a flag in each base. Your actor can grab it, pass it to another actor, throw it down or capture it in your own base to score!
+There is a flag in each base. Your actor can grab it, pass it to another actor, 
+throw it down or capture it in your own base to score!
 
 ### Walls
 
@@ -146,31 +155,40 @@ You, and your actors, cant walk through these!
 
 ## Orders
 
-You can perform a couple of orders do reach your goals of co-worker domination. Orders are executed in the order (no pun intended) 
-below. 
-But beware, each _actor_ can only carry out each order only once per game tick. Find the documentation of the orders in the auto-generated docs below.
+You can perform a couple of orders do reach your goals of co-worker domination. 
+Orders are executed in the order (no pun intended) below. 
+But beware, each _actor_ can only carry out each order only once per game tick. 
+Find the documentation of the orders in the auto-generated docs below.
 
 ## States
 
-To act you need to know things. ASCI fight is a perfect information game. So you can directly see what you need to do and what your actions have caused.
+To act you need to know things. ASCI fight is a perfect information game. So you 
+can directly see what you need to do and what your actions have caused.
 
 ### Game State
 
-This gets you the current state of the game. The position of each game component is something you can find here. Also other information like the current tick and such.
+This gets you the current state of the game. The position of each game component 
+is something you can find here. Also other information like the current tick and 
+such.
 
 ### Game Rules
 
-This section is static per game and tells you what each actor can do, if the flag needs to be at home to score, what the maximum score or tick number is and other static information.
+This section is static per game and tells you what each actor can do, if the flag 
+needs to be at home to score, what the maximum score or tick number is and other 
+static information.
 
 ### Game Timing
 
-Here you get the current tick and when the next tick executes both on absolute time and time-deltas. This is more lightweight than the _Game State_ an can be queried often. 
+Here you get the current tick and when the next tick executes both on absolute time 
+and time-deltas. This is more lightweight than the _Game State_ an can be queried 
+often. 
 
 ## Logistics
 
 ### Log Files
 
-This service tells you which log files are available. 'game.log' is always the log file of the current game. Others get a number attached.
+This service tells you which log files are available. 'game.log' is always the log 
+file of the current game. Others get a number attached.
 
 You can fetch log files through the '/logs/[filename]' endpoint.
 

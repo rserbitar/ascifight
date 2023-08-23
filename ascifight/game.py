@@ -45,7 +45,10 @@ class MoveOrder(Order):
     )
     direction: computations.Directions = Field(
         title="Direction",
-        description="The direction to move to from the position of the actor. 'up' increases the y coordinate and 'right' increases the x coordinate.",
+        description=(
+            "The direction to move to from the position of the actor. 'up' "
+            "increases the y coordinate and 'right' increases the x coordinate."
+        ),
     )
 
     def __str__(self) -> str:
@@ -190,7 +193,12 @@ class Game:
                 for team, score in self.overall_scores.items()
             ]
         )
-        return f"{util.colors['bold']}Overall Score{util.colors['revert']}: {overall_score} \n{util.colors['bold']}Current Score{util.colors['revert']}: {current_score}"
+        return (
+            f"{util.colors['bold']}Overall Score{util.colors['revert']}: "
+            f"{overall_score}\n"
+            f"{util.colors['bold']}Current Score{util.colors['revert']}: "
+            f"{current_score}"
+        )
 
     def _set_scores(self) -> None:
         for team in self.board.names_teams.values():
