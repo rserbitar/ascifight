@@ -1,6 +1,8 @@
 import enum
+from itertools import chain
 
 import ascifight.board.data as data
+import ascifight.globals as globals
 
 
 class Directions(str, enum.Enum):
@@ -81,3 +83,38 @@ def distance_vector(
     x = target.x - origin.x
     y = target.y - origin.y
     return x, y
+
+
+def nearest_enemy_coordinates(actor: data.Actor) -> data.Coordinates:
+    board = globals.my_game.board
+    all_actors = board.actors_of_team
+    enemy_actors = chain.from_iterable(
+        [actors for team, actors in all_actors.items() if team != actor.team]
+    )
+    actor_coordinates = board.actors_coordinates[actor]
+    result = []
+    for enemy_actor in enemy_actors:
+        enemy_coordinates = board.actors_coordinates[enemy_actor]
+        dist = distance(
+            actor_coordinates,
+            enemy_coordinates,
+        )
+        result.append((dist, enemy_coordinates))
+    result.sort(key=lambda x: x[0])
+    return result[0][1]
+
+
+def nearest_enemy_flag_coordinates(actor: data.Actor) -> data.Coordinates:
+    board = globals.my_game.board
+    flags = board.flags_coordinates
+    actor_coordinates = board.actors_coordinates[actor]
+    result = []
+    for flag, coordinates in flags.items():
+        if flag.team != actor.team:
+            dist = distance(
+                actor_coordinates,
+                coordinates,
+            )
+            result.append((dist, coordinates))
+    result.sort(key=lambda x: x[0])
+    return result[0][1]

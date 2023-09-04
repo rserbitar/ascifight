@@ -1,60 +1,11 @@
-import secrets
 from typing import Annotated
 
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
-import ascifight.config as config
 import ascifight.globals as globals
 import ascifight.game as game
-import ascifight.board.computations as computations
-
-security = HTTPBasic()
-
-
-teams: dict[bytes, bytes] = {
-    team["name"].encode("utf8"): team["password"].encode("utf8")
-    for team in config.config["teams"]
-}
-
-
-def get_current_team(credentials: Annotated[HTTPBasicCredentials, Depends(security)]):
-    current_username_bytes = credentials.username.encode("utf8")
-
-    current_password_bytes = credentials.password.encode("utf8")
-    correct_password_bytes = b""
-    if current_username_bytes in teams.keys():
-        correct_password_bytes = teams[current_username_bytes]
-    is_correct_password = secrets.compare_digest(
-        current_password_bytes, correct_password_bytes
-    )
-    if not is_correct_password:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-    return credentials.username
-
-
-actor_annotation = Annotated[
-    int,
-    Path(
-        title="Actor",
-        description="The actor to act.",
-        ge=0,
-        le=len(config.config["game"]["actors"]) - 1,
-    ),
-]
-
-direction_annotation = Annotated[
-    computations.Directions,
-    Query(
-        title="Direction",
-        description="The direction the actor should perform the action to.",
-    ),
-]
+import ascifight.routers.router_utils as router_utils
 
 
 class OrderResponse(BaseModel):
@@ -69,9 +20,9 @@ router = APIRouter(
 
 @router.post("/move/{actor}", status_code=202)
 async def move_order(
-    team: Annotated[str, Depends(get_current_team)],
-    actor: actor_annotation,
-    direction: direction_annotation,
+    team: Annotated[str, Depends(router_utils.get_current_team)],
+    actor: router_utils.actor_annotation,
+    direction: router_utils.direction_annotation,
 ) -> OrderResponse:
     """With a move order you can move around any of your _actors_, by exactly one
     field in any non-diagonal direction.
@@ -91,9 +42,9 @@ async def move_order(
 
 @router.post("/grabput/{actor}", status_code=202)
 async def grabput_order(
-    team: Annotated[str, Depends(get_current_team)],
-    actor: actor_annotation,
-    direction: direction_annotation,
+    team: Annotated[str, Depends(router_utils.get_current_team)],
+    actor: router_utils.actor_annotation,
+    direction: router_utils.direction_annotation,
 ) -> OrderResponse:
     """If an _actor_ does not have the flag, it can grab it with this order.
     Give it a direction from its current position and it will try to grab
@@ -119,9 +70,9 @@ async def grabput_order(
 
 @router.post("/attack/{actor}", status_code=202)
 async def attack_order(
-    team: Annotated[str, Depends(get_current_team)],
-    actor: actor_annotation,
-    direction: direction_annotation,
+    team: Annotated[str, Depends(router_utils.get_current_team)],
+    actor: router_utils.actor_annotation,
+    direction: router_utils.direction_annotation,
 ) -> OrderResponse:
     """With attack orders you can force other actors, even your own, to respawn near
     their base. Just hit them and they are gone.
@@ -140,9 +91,9 @@ async def attack_order(
 
 @router.post("/destroy/{actor}", status_code=202)
 async def destroy_order(
-    team: Annotated[str, Depends(get_current_team)],
-    actor: actor_annotation,
-    direction: direction_annotation,
+    team: Annotated[str, Depends(router_utils.get_current_team)],
+    actor: router_utils.actor_annotation,
+    direction: router_utils.direction_annotation,
 ) -> OrderResponse:
     """Destroy orders you can remove those pesky walls. Just walk up to them and
     target the next wall with a destroy order.
@@ -159,9 +110,9 @@ async def destroy_order(
 
 @router.post("/build/{actor}", status_code=202)
 async def build_order(
-    team: Annotated[str, Depends(get_current_team)],
-    actor: actor_annotation,
-    direction: direction_annotation,
+    team: Annotated[str, Depends(router_utils.get_current_team)],
+    actor: router_utils.actor_annotation,
+    direction: router_utils.direction_annotation,
 ) -> OrderResponse:
     """Build orders can get you more walls where you want them. Walk next to the
     location where you want a wall and then start building.
