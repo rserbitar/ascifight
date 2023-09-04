@@ -100,12 +100,12 @@ class BoardActions:
                 or target_coordinates in self.board_data.walls_coordinates
             )
             if illegal_target:
-                self._logger.warning(f"Target field is either not empty.")
+                self._logger.warning("Target field is either not empty.")
             else:
                 build_successful = random.random() < actor.build
                 built = True
                 if not build_successful:
-                    self._logger.info(f"Building did not work.")
+                    self._logger.info("Building did not work.")
                 else:
                     self._logger.info(
                         f"{actor} successfully built a wall at {target_coordinates}."
@@ -121,15 +121,16 @@ class BoardActions:
             target_coordinates = self.calc_target_coordinates(actor, direction)
             target = target_coordinates in self.board_data.walls_coordinates
             if not target:
-                self._logger.warning(f"Target field does not contain a wall.")
+                self._logger.warning("Target field does not contain a wall.")
             else:
                 destroy_successful = random.random() < actor.destroy
                 destroyed = True
                 if not destroy_successful:
-                    self._logger.info(f"Destruction did not work.")
+                    self._logger.info("Destruction did not work.")
                 else:
                     self._logger.info(
-                        f"{actor} successfully destroyed a wall at {target_coordinates}."
+                        f"{actor} successfully destroyed a wall at "
+                        " {target_coordinates}."
                     )
                     self.board_data.walls_coordinates.add(target_coordinates)
         return destroyed
@@ -151,12 +152,14 @@ class BoardActions:
             if target_actor is not None:
                 if not target_actor.grab:
                     self._logger.warning(
-                        f"{actor} can not hand the flag to actor {target_actor}. Can not have the flag."
+                        f"{actor} can not hand the flag to actor {target_actor}. "
+                        " Can not have the flag."
                     )
 
                 elif target_actor.flag is not None:
                     self._logger.warning(
-                        f"{actor} can not hand the flag to actor {target_actor}. Target already has a flag."
+                        f"{actor} can not hand the flag to actor {target_actor}. "
+                        "Target already has a flag."
                     )
 
                 else:
@@ -201,7 +204,8 @@ class BoardActions:
                     if target_actor is not None:
                         target_actor.flag = None
                         self._logger.info(
-                            f"{actor} grabbed the flag of {flag.team} from {target_actor}."
+                            f"{actor} grabbed the flag of {flag.team} from "
+                            "{target_actor}."
                         )
                     else:
                         self._logger.info(f"{actor} grabbed the flag of {flag.team}.")

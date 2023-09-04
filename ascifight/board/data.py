@@ -1,11 +1,9 @@
 import abc
 import sys
 import itertools
-import os
 import typing
 
 from pydantic import BaseModel, Field
-import toml
 import structlog
 
 import ascifight.config as config
@@ -29,12 +27,14 @@ class Team(BaseModel):
 
 class Coordinates(BaseModel):
     x: int = Field(
-        description="X coordinate is decreased by the 'left' and increased by the 'right' direction.",
+        description="X coordinate is decreased by the 'left' and increased by the"
+        " 'right' direction.",
         ge=0,
         le=config.config["game"]["map_size"] - 1,
     )
     y: int = Field(
-        description="Y coordinate is decreased by the 'down' and increased by the 'up' direction.",
+        description="Y coordinate is decreased by the 'down' and increased by the"
+        " 'up' direction.",
         ge=0,
         le=config.config["game"]["map_size"] - 1,
     )
@@ -61,9 +61,10 @@ class ActorProperty(BaseModel):
         "An actor with 0 can not carry the flag. Not even when it is given to it.",
     )
     attack: float = Field(
-        description="The probability to successfully attack. An actor with 0 can not attack.",
+        description="The probability to successfully attack. An actor with 0 can "
+        "not attack.",
     )
-    build: float = Field(description="The probability to successfully build a wall. ")
+    build: float = Field(description="The probability to successfully build a wall.")
     destroy: float = Field(
         description="The probability to successfully destroy a wall."
     )

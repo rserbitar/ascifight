@@ -2,7 +2,6 @@ import io
 
 import pydantic
 from PIL import Image, ImageDraw, ImageFont
-import ascifight
 
 import ascifight.config as config
 import ascifight.board.data as data

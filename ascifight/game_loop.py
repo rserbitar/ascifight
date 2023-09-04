@@ -2,7 +2,8 @@ import asyncio
 import importlib
 import datetime
 import os
-import logging, logging.handlers
+import logging
+import logging.handlers
 
 import structlog
 from structlog.contextvars import bind_contextvars

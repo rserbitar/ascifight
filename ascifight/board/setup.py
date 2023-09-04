@@ -1,5 +1,4 @@
 from pydantic import ValidationError
-import toml
 import structlog
 
 import random
