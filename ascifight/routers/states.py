@@ -10,6 +10,8 @@ import ascifight.util as util
 
 
 class ActorDescription(BaseModel):
+    """An actor able to execute orders."""
+
     type: str = Field(description="The type of the actor determining its capabilities.")
     team: str = Field(description="The name of the actor's team.")
     ident: int = Field(description="The identity number specific to the team.")
@@ -22,6 +24,8 @@ class ActorDescription(BaseModel):
 
 
 class FlagDescription(BaseModel):
+    """A flag that can be grabbed and put."""
+
     team: str = Field(description="The name of the flags's team.")
     coordinates: data.Coordinates = Field(
         description="The current coordinates fo the flag."
@@ -29,6 +33,8 @@ class FlagDescription(BaseModel):
 
 
 class BaseDescription(BaseModel):
+    """A base that can hold or cap a flag."""
+
     team: str = Field(description="The name of the base's team.")
     coordinates: data.Coordinates = Field(
         description="The current coordinates fo the base."
@@ -36,12 +42,16 @@ class BaseDescription(BaseModel):
 
 
 class Scores(BaseModel):
+    """Scores describing who is currently winning the game."""
+
     team: str = Field(description="The name of the team.")
     score: int = Field(description="The scores of the current game.")
     color: str = Field(description="The color of the team.")
 
 
 class AllScoresResponse(BaseModel):
+    """The total scores of all games."""
+
     scores: list[Scores] = Field(description="The scores of the current game.")
     overall_scores: list[Scores] = Field(
         description="The current overall scores of all games."
@@ -49,6 +59,8 @@ class AllScoresResponse(BaseModel):
 
 
 class StateResponse(BaseModel):
+    """All entities of a game including their coordinates."""
+
     teams: list[str] = Field(description="A list of all teams in the game.")
     actors: list[ActorDescription] = Field(
         description="A list of all actors in the game."
@@ -66,6 +78,8 @@ class StateResponse(BaseModel):
 
 
 class TimingResponse(BaseModel):
+    """Various current timing data."""
+
     tick: int = Field(description="The last game tick.")
     time_to_next_execution: float = Field(
         description="The time to next execution in seconds."
@@ -76,6 +90,8 @@ class TimingResponse(BaseModel):
 
 
 class RulesResponse(BaseModel):
+    """The current rules affecting the current game."""
+
     map_size: int = Field(
         description="The length of the game board in x and y.",
     )

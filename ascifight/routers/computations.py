@@ -31,8 +31,8 @@ async def get_nearest_enemy_coordinates(
     team: Annotated[str, Depends(router_utils.get_current_team)],
     actor: router_utils.actor_annotation,
 ) -> data.Coordinates:
-    """Retrieve the coordinates of the nearest enemy. In case of multiple enemies
-    with the same distance, result is chosen by internal order."""
+    """Retrieve the coordinates of the nearest enemy of an actor. In case of
+    multiple enemies with the same distance, result is chosen by internal order."""
     full_actor = globals.my_game.board.teams_actors[
         (globals.my_game.board.names_teams[team], actor)
     ]
@@ -44,8 +44,8 @@ async def get_nearest_enemy_flag_coordinates(
     team: Annotated[str, Depends(router_utils.get_current_team)],
     actor: router_utils.actor_annotation,
 ) -> data.Coordinates:
-    """Retrieve the coordinates of the nearest enemy flag. In case of multiple
-    enemy flags with the same distance, result is chosen by internal order."""
+    """Retrieve the coordinates of the nearest enemy flag to an actor. In case of
+    multiple enemy flags with the same distance, result is chosen by internal order."""
     full_actor = globals.my_game.board.teams_actors[
         (globals.my_game.board.names_teams[team], actor)
     ]

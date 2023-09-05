@@ -27,6 +27,14 @@ async def move_order(
     """With a move order you can move around any of your _actors_, by exactly one
     field in any non-diagonal direction.
 
+    Coordinate field starts with 0/0 in the lower left. The direction modifies the
+    coordinates of an actor as follows:
+
+    * up: y+=1
+    * down: y-=1
+    * right: x+=1
+    * left: x-=1
+
     It is not allowed to step on fields:
 
     * **contain another actor**
