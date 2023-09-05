@@ -12,7 +12,11 @@ router = APIRouter()
 
 @router.get("/log_files", tags=["logistics"])
 async def get_log_files() -> list[str]:
-    """Get all log files accessible through /logs/[filename]"""
+    """This service  fetches a sit of available log files.
+    'game.log' is always the log file of the current game. Others get a number
+    attached.
+
+    The log files itself can be fetched using the '/logs/[filename]' endpoint."""
     return os.listdir(config.config["server"]["log_dir"])
 
 
@@ -29,6 +33,7 @@ async def get_log_files() -> list[str]:
     response_class=Response,
 )
 def get_game_map() -> Response:
+    """Returns a png image of the current state of the game."""
     image = draw.draw_game_map(globals.my_game.board)
     return Response(content=image, media_type="image/png")
 

@@ -10,6 +10,28 @@ import ascifight.board.computations as computations
 
 security = HTTPBasic()
 
+tags_metadata = [
+    {
+        "name": "orders",
+        "description": "Operations to give orders to your actors.",
+    },
+    {
+        "name": "states",
+        "description": "Operations to get state information about the game.",
+    },
+    {
+        "name": "logistics",
+        "description": "Operations to provide quality of life support.",
+    },
+    {
+        "name": "computations",
+        "description": "Computational functions that help to create 'AI' scripts.",
+    },
+    {
+        "name": "web-page",
+        "description": "Web-pages to display various information.",
+    },
+]
 
 teams: dict[bytes, bytes] = {
     team["name"].encode("utf8"): team["password"].encode("utf8")

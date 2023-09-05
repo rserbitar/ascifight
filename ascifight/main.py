@@ -14,6 +14,7 @@ import ascifight.config as config
 import ascifight.routers.orders as orders
 import ascifight.routers.states as states
 import ascifight.routers.other as other
+import ascifight.routers.router_utils as router_utils
 import ascifight.routers.computations as computations
 
 import ascifight.util as util
@@ -46,32 +47,8 @@ root_logger = logging.getLogger()
 logger = structlog.get_logger()
 
 
-tags_metadata = [
-    {
-        "name": "orders",
-        "description": "Operations to give orders to your actors.",
-    },
-    {
-        "name": "states",
-        "description": "Operations to get state information about the game.",
-    },
-    {
-        "name": "logistics",
-        "description": "Operations to provide quality of life support.",
-    },
-    {
-        "name": "computations",
-        "description": "Computational functions that help to create 'AI' scripts.",
-    },
-    {
-        "name": "web-page",
-        "description": "Web-pages to display various information.",
-    },
-]
-
-
 app = FastAPI(
-    openapi_tags=tags_metadata,
+    openapi_tags=router_utils.tags_metadata,
     title="A Social, Community Increasing - Fight",
     description=util.api_description,
     version="0.2.0",

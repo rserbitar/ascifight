@@ -178,7 +178,9 @@ async def get_scores() -> AllScoresResponse:
 
 @router.get("/game_rules")
 async def get_game_rules() -> RulesResponse:
-    """Get the current rules and actor properties."""
+    """This section is static per game and returns what each actor can do,
+    if the flag needs to be at home to score, what the maximum score or
+    tick number is and other static information."""
     actor_properties = globals.my_game.board.get_actor_properties()
     return RulesResponse(
         map_size=config.config["game"]["map_size"],
@@ -194,8 +196,12 @@ async def get_game_rules() -> RulesResponse:
 
 @router.get("/timing")
 async def get_timing() -> TimingResponse:
-    """Get the current tick and time of next execution. If current tick is 0,
-    game has not yet started."""
+    """
+    Returns the current tick and when the next tick executes both on absolute time
+    and time-deltas. If current tick is 0, game has not yet started.
+
+    This is more lightweight than the _Game State_ an can be queried
+    often. Get the current tick and time of next execution."""
     return TimingResponse(
         tick=globals.my_game.tick,
         time_to_next_execution=(

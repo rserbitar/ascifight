@@ -153,47 +153,12 @@ throw it down or capture it in your own base to score!
 
 You, and your actors, cant walk through these!
 
-## Orders
 
-You can perform a couple of orders do reach your goals of co-worker domination. 
-Orders are executed in the order (no pun intended) below. 
-But beware, each _actor_ can only carry out each order only once per game tick. 
-Find the documentation of the orders in the auto-generated docs below.
+Find a list of endpoints that allow you to play the game below.
 
-## States
 
-To act you need to know things. ASCI fight is a perfect information game. So you 
-can directly see what you need to do and what your actions have caused.
 
-### Game State
 
-This gets you the current state of the game. The position of each game component 
-is something you can find here. Also other information like the current tick and 
-such.
 
-### Game Rules
-
-This section is static per game and tells you what each actor can do, if the flag 
-needs to be at home to score, what the maximum score or tick number is and other 
-static information.
-
-### Game Timing
-
-Here you get the current tick and when the next tick executes both on absolute time 
-and time-deltas. This is more lightweight than the _Game State_ an can be queried 
-often. 
-
-## Logistics
-
-### Log Files
-
-This service tells you which log files are available. 'game.log' is always the log 
-file of the current game. Others get a number attached.
-
-You can fetch log files through the '/logs/[filename]' endpoint.
-
-## Image
-
-Fetch a png image of the current state of the game!
 
 """
