@@ -43,27 +43,21 @@ def calc_target_coordinate_direction(
             direction = [Directions.up, Directions.right]
         elif x > 0 and y < 0:
             direction = [Directions.right, Directions.down]
-        if x < 0 and y > 0:
+        elif x < 0 and y > 0:
             direction = [Directions.left, Directions.up]
         elif x < 0 and y < 0:
             direction = [Directions.down, Directions.left]
 
-    elif y > 0:
-        if abs(y) > abs(x):
+    elif abs(y) > abs(x):
+        if y > 0:
             direction = [Directions.up]
         else:
-            if x > 0:
-                direction = [Directions.right]
-            else:
-                direction = [Directions.left]
-    else:
-        if abs(y) > abs(x):
             direction = [Directions.down]
+    else:
+        if x > 0:
+            direction = [Directions.right]
         else:
-            if x > 0:
-                direction = [Directions.right]
-            else:
-                direction = [Directions.left]
+            direction = [Directions.left]
 
     return direction
 
