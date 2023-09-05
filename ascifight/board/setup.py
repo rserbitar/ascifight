@@ -62,16 +62,26 @@ class BoardSetup:
             for i in range(2, self.map_size - 2)
             for j in range(2, self.map_size - 2)
         ]
-
-        for team in self.teams:
-            place_chosen = random.choice(available_places)
-            available_places = [
-                i
-                for i in available_places
-                if i not in self._get_area_positions(place_chosen, minimum_distance)
-            ]
-            self.board_data.bases_coordinates[data.Base(team=team)] = place_chosen
-            self.board_data.flags_coordinates[data.Flag(team=team)] = place_chosen
+        i = 0
+        while i < len(self.teams):
+            team = self.teams[i]
+            if not available_places:
+                i = 0
+                available_places = [
+                    data.Coordinates(x=i, y=j)
+                    for i in range(2, self.map_size - 2)
+                    for j in range(2, self.map_size - 2)
+                ]
+            else:
+                place_chosen = random.choice(available_places)
+                available_places = [
+                    i
+                    for i in available_places
+                    if i not in self._get_area_positions(place_chosen, minimum_distance)
+                ]
+                self.board_data.bases_coordinates[data.Base(team=team)] = place_chosen
+                self.board_data.flags_coordinates[data.Flag(team=team)] = place_chosen
+                i += 1
 
     def _get_area_positions(
         self, center: data.Coordinates, distance: int
