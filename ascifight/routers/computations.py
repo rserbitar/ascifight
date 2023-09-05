@@ -14,14 +14,16 @@ router = APIRouter(
 
 @router.post("/direction")
 async def get_direction(
-    origin: data.Coordinates, target: data.Coordinates
+    origin: router_utils.origin_annotation, target: router_utils.target_annotation
 ) -> list[computations.Directions]:
     """Calculate the direction(s) to the target field from an origin field."""
     return computations.calc_target_coordinate_direction(origin, target)
 
 
 @router.post("/distance")
-async def get_distance(origin: data.Coordinates, target: data.Coordinates) -> int:
+async def get_distance(
+    origin: router_utils.origin_annotation, target: router_utils.target_annotation
+) -> int:
     """Calculate the distance in fields to the target field from an origin field."""
     return computations.distance(origin, target)
 

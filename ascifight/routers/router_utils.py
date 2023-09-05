@@ -2,9 +2,10 @@ import secrets
 from typing import Annotated
 
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from fastapi import Depends, HTTPException, status, Query, Path
+from fastapi import Depends, HTTPException, status, Query, Path, Body
 
 import ascifight.config as config
+import ascifight.board.data as data
 import ascifight.board.computations as computations
 
 security = HTTPBasic()
@@ -50,5 +51,21 @@ direction_annotation = Annotated[
     Query(
         title="Direction",
         description="The direction the actor should perform the action to.",
+    ),
+]
+
+origin_annotation = Annotated[
+    data.Coordinates,
+    Body(
+        title="Origin Coordinates",
+        description="The coordinates of the origin field.",
+    ),
+]
+
+target_annotation = Annotated[
+    data.Coordinates,
+    Body(
+        title="Target Coordinates",
+        description="The coordinates of the target field.",
     ),
 ]
