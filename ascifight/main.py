@@ -4,6 +4,8 @@ import logging.handlers
 import asyncio
 import os
 
+import uvicorn
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
@@ -72,3 +74,7 @@ app.mount(
 async def startup():
     logger.info("Starting server.")
     asyncio.create_task(game_loop.routine())
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="debug")

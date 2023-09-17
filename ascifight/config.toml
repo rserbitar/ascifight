@@ -5,7 +5,7 @@ log_dir = "logs"  # don't change during runtime
 scores_file = "scores.log"
 
 [game]
-map_size = 15
+map_size = 20
 max_score = 3
 max_ticks = 200
 capture_score = 5
@@ -13,7 +13,7 @@ kill_score = 1
 winning_bonus = 10
 home_flag_required = false
 walls = 0
-actors = ["Runner"]
+actors = ["Runner", "Runner", "Runner"]
 
 [[teams]]
 name = "Team 1"
@@ -27,5 +27,9 @@ password = "2"
 name = "Team 3"
 password = "3"
 
+[[teams]]
+name = "Team 4"
+password = "4"
+
 [image]
-size = 800
+size = 980

@@ -8,21 +8,23 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.10"
 fastapi = "^0.101.1"
-pydantic = "^2.2.1"
+pydantic = "^2.3.0"
 uvicorn = "^0.23.2"
 structlog = "^23.1.0"
 context-logging = "^1.2.0"
 toml = "^0.10.2"
-pillow = "^10.0.0"
+pillow = "^10.0.1"
 httpx = "^0.24.1"
 vpython = "^7.6.4"
 
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.5.1"
-black = "^23.7.0"
+black = "^23.9.1"
 types-toml = "^0.10.8.7"
-pytest = "^7.4.0"
+pytest = "^7.4.2"
+types-pillow = "^10.0.0.3"
+
 
 [build-system]
 requires = ["poetry-core"]

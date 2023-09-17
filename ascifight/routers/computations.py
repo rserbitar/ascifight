@@ -28,7 +28,7 @@ async def get_distance(
     return computations.distance(origin, target)
 
 
-@router.post("/nearest_enemy")
+@router.post("/nearest_enemy/{actor}")
 async def get_nearest_enemy_coordinates(
     team: Annotated[str, Depends(router_utils.get_current_team)],
     actor: router_utils.actor_annotation,
@@ -38,10 +38,10 @@ async def get_nearest_enemy_coordinates(
     full_actor = globals.my_game.board.teams_actors[
         (globals.my_game.board.names_teams[team], actor)
     ]
-    return computations.nearest_enemy_flag_coordinates(full_actor)
+    return computations.nearest_enemy_coordinates(full_actor)
 
 
-@router.post("/nearest_enemy_flag")
+@router.post("/nearest_enemy_flag/{actor}")
 async def get_nearest_enemy_flag_coordinates(
     team: Annotated[str, Depends(router_utils.get_current_team)],
     actor: router_utils.actor_annotation,

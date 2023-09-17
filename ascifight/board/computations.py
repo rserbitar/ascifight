@@ -83,7 +83,7 @@ def nearest_enemy_coordinates(actor: data.Actor) -> data.Coordinates:
     board = globals.my_game.board
     all_actors = board.actors_of_team
     enemy_actors = chain.from_iterable(
-        [actors for team, actors in all_actors.items() if team != actor.team]
+        [actors for team, actors in all_actors.items() if team != actor.team.name]
     )
     actor_coordinates = board.actors_coordinates[actor]
     result = []
