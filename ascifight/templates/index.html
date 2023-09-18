@@ -3,12 +3,16 @@
   <head>
     <script>
       async function refresh() {
+        const url =
+          window.location.protocol +
+          "//" +
+          window.location.hostname +
+          ":" +
+          window.location.port;
         document.getElementById("image").src =
-          "http://127.0.0.1:8000/game_map?rand" + Math.random();
+          url + "/game_map?rand" + Math.random();
 
-        const response = await fetch(
-          "http://127.0.0.1:8000/states/scores"
-        ).then();
+        const response = await fetch(url + "/states/scores").then();
         const scores = await response.json();
         score_string = '<h2 style="color: white"> This Game: ';
         for (const score of scores.scores) {
