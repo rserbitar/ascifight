@@ -331,7 +331,7 @@ class BoardActions:
         elif self.board_data.coordinates_actors.get(new_coordinates) is not None:
             self._logger.warning(f"{actor} did not move. Target field is occupied.")
         elif self.board_data.coordinates_bases.get(new_coordinates) is not None:
-            self._logger.warning(f"{actor} did not move. Target field is abase.")
+            self._logger.warning(f"{actor} did not move. Target field is a base.")
         elif new_coordinates in self.board_data.walls_coordinates:
             self._logger.warning(f"{actor} did not move. Target field is a wall.")
         else:
