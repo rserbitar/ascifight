@@ -48,10 +48,10 @@ async def single_game() -> None:
         commands = await get_all_queue_items(globals.command_queue)
 
         bind_contextvars(tick=globals.my_game.tick)
-        os.system("cls" if os.name == "nt" else "clear")
-
-        print(globals.my_game.scoreboard())
-        print(globals.my_game.board.image())
+        if config.config["server"]["terminal_map"]:
+            os.system("cls" if os.name == "nt" else "clear")
+            print(globals.my_game.scoreboard())
+            print(globals.my_game.board.image())
 
         logger.info("Starting tick execution.")
         globals.my_game.execute_game_step(commands)
@@ -64,9 +64,10 @@ async def single_game() -> None:
 
         await asyncio.sleep(config.config["server"]["tick_wait_time"])
     globals.my_game.end_game()
-    os.system("cls" if os.name == "nt" else "clear")
-    print(globals.my_game.scoreboard())
-    print(globals.my_game.board.image())
+    if config.config["server"]["terminal_map"]:
+        os.system("cls" if os.name == "nt" else "clear")
+        print(globals.my_game.scoreboard())
+        print(globals.my_game.board.image())
 
 
 async def get_all_queue_items(

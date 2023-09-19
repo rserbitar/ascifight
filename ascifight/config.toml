@@ -1,6 +1,7 @@
 [server]
 pre_game_wait = 5
 tick_wait_time = 5
+terminal_map = false
 log_dir = "logs"  # don't change during runtime
 scores_file = "scores.log"
 
