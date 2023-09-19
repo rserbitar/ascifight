@@ -95,7 +95,7 @@ color_names = {
 color_rgb_mapping = {
     "white": (255, 255, 255),
     "red": (255, 0, 0),
-    "green": (0, 255, 0),
+    "green": (0, 120, 0),
     "blue": (0, 0, 255),
     "yellow": (255, 255, 0),
     "purple": (128, 0, 128),
