@@ -130,9 +130,9 @@ class BoardActions:
                 else:
                     self._logger.info(
                         f"{actor} successfully destroyed a wall at "
-                        " {target_coordinates}."
+                        f" {target_coordinates}."
                     )
-                    self.board_data.walls_coordinates.add(target_coordinates)
+                    self.board_data.walls_coordinates.remove(target_coordinates)
         return destroyed
 
     def grabput_flag(
