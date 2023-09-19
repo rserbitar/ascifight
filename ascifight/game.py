@@ -339,5 +339,5 @@ class Game:
 
     def check_game_end(self):
         return (
-            self.tick == self.max_ticks or max(self.scores.values()) == self.max_score
+            self.tick == self.max_ticks or max(self.scores.values()) >= self.max_score
         )
