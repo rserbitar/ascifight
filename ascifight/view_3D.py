@@ -26,7 +26,7 @@ class AsciFight3D:
         self.static_vobjects = {}
         self.dynamic_vobjects = {}
         self.game_information = CachedGameInfo()
-        self.actor_drawer = collections.defaultdict(self.new_runner)
+        self.actor_drawer = collections.defaultdict(lambda: self.new_runner)
         self.actor_drawer['Runner'] = self.new_runner
         self.animations = {}
 
