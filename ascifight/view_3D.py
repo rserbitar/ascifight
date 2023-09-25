@@ -26,8 +26,7 @@ class AsciFight3D:
         self.static_vobjects = {}
         self.dynamic_vobjects = {}
         self.game_information = CachedGameInfo()
-        self.actor_drawer = collections.defaultdict(lambda: self.new_runner)
-        self.actor_drawer['Runner'] = self.new_runner
+        self.actor_drawer = collections.defaultdict(lambda: self.new_actor)
         self.animations = {}
 
         vpython.scene.width = 800
@@ -164,13 +163,17 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
                             color=color,
                             texture={'file': vpython.textures.wood_old, 'bumpmap': vpython.bumpmaps.wood_old})
 
-    def new_runner(self, pos, color, game_object):
+    def new_actor(self, pos, color, game_object):
         self.fix_text_alignment_errors()
         cylinder = vpython.cylinder(pos=pos, color=color, radius=0.45, axis=vpython.vector(0, 0, .5),
                                     )
-        number = vpython.text(text=str(game_object['ident']), pos=pos + vpython.vector(0, -0.2, 0),
-                              depth=0.55, color=vpython.color.black, height=0.4, align='center')
-        runner = vpython.compound([cylinder, number], origin=pos,
+        text = vpython.text(text=f"{game_object['type'][0]}{game_object['ident']}",
+                            pos=pos + vpython.vector(0, -0.2, 0),
+                            depth=0.55,
+                            color=vpython.color.black,
+                            height=0.4,
+                            align='center')
+        runner = vpython.compound([cylinder, text], origin=pos,
                                   texture={'file': vpython.textures.metal, 'bumpmap': vpython.bumpmaps.stucco})
         return runner
 
