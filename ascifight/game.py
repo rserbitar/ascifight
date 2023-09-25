@@ -231,7 +231,7 @@ class Game:
                     try:
                         self.overall_scores[self.board.names_teams[team]] += score
                     # ignore score if team is not in current teams
-                    except ValueError:
+                    except KeyError:
                         pass
         # if the file is not yet there assume default scores
         except FileNotFoundError:
