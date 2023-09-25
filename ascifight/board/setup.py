@@ -1,3 +1,5 @@
+import math
+
 from pydantic import ValidationError
 import structlog
 
@@ -21,6 +23,7 @@ class BoardSetup:
         self.map_size = map_size
         self.board_data = game_board_data
         self.walls = walls
+        self.num_players = len(teams)
 
         self.names_teams: dict[str, data.Team] = {
             team["name"]: data.Team(
@@ -56,32 +59,22 @@ class BoardSetup:
         self._place_walls()
 
     def _place_bases_and_flags(self) -> None:
-        minimum_distance = int((self.map_size**2 / len(self.teams)) ** 0.5 / 1.2) - 1
-        available_places = [
-            data.Coordinates(x=i, y=j)
-            for i in range(2, self.map_size - 2)
-            for j in range(2, self.map_size - 2)
-        ]
-        i = 0
-        while i < len(self.teams):
-            team = self.teams[i]
-            if not available_places:
-                i = 0
-                available_places = [
-                    data.Coordinates(x=i, y=j)
-                    for i in range(2, self.map_size - 2)
-                    for j in range(2, self.map_size - 2)
-                ]
-            else:
-                place_chosen = random.choice(available_places)
-                available_places = [
-                    i
-                    for i in available_places
-                    if i not in self._get_area_positions(place_chosen, minimum_distance)
-                ]
-                self.board_data.bases_coordinates[data.Base(team=team)] = place_chosen
-                self.board_data.flags_coordinates[data.Flag(team=team)] = place_chosen
-                i += 1
+        half_size = self.map_size / 2
+        minimum_distance = int(half_size / 2)
+        maximum_distance = int((1.4 if self.num_players in (2, 4) else 1) * half_size - 2)
+
+        # With 2 minimum distance to border and half distance to center, this is equivalent to a minimum map size of 11
+        assert maximum_distance > minimum_distance
+
+        random_distance = random.randint(minimum_distance, maximum_distance)
+        angle_step = 2 * math.pi / self.num_players
+        base_angle = math.pi / 4
+        for i, team in enumerate(self.teams):
+            pos_x = int(math.sin(base_angle + i * angle_step) * random_distance + half_size)
+            pos_y = int(math.cos(base_angle + i * angle_step) * random_distance + half_size)
+            starting_pos = data.Coordinates(x=pos_x, y=pos_y)
+            self.board_data.bases_coordinates[data.Base(team=team)] = starting_pos
+            self.board_data.flags_coordinates[data.Flag(team=team)] = starting_pos
 
     def _get_area_positions(
         self, center: data.Coordinates, distance: int
