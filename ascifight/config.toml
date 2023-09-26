@@ -13,7 +13,7 @@ capture_score = 5
 kill_score = 1
 winning_bonus = 10
 home_flag_required = false
-walls = 0
+walls = 0   # Target integer number of walls (+- symmetries), or floating percentage of walls
 actors = ["Runner", "Runner", "Runner"]
 
 [[teams]]
