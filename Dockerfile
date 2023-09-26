@@ -18,9 +18,6 @@ RUN pip3 install structlog
 RUN pip3 install context-logging
 RUN pip3 install toml
 RUN pip3 install pillow
-RUN pip3 install structlog
-RUN pip3 install toml
-RUN pip3 install pillow
 RUN pip3 install httpx
 RUN pip3 install vpython
 
