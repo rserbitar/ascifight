@@ -4,7 +4,6 @@ from pydantic import ValidationError
 import structlog
 
 import random
-import itertools
 
 import ascifight.board.data as data
 
@@ -130,7 +129,7 @@ class BoardSetup:
             # Unfortunately, nothing really works perfectly for 3 or >= 5 players. That is just maths, because you
             # cannot map these symmetries onto discrete squares without any bias.
             angle = random.random() * angle_range + min_angle
-            # The CDF of a square PDF is the square root. Knowing that, we do a Smirnov transform
+            # The inverse CDF of a linear PDF is the square root. Knowing that, we do a Smirnov transform
             random_distance = math.sqrt(random.random()) * maximum_distance
             for i in range(self.num_players):
                 pos_x = int(math.sin(angle + i * angle_step) * random_distance + half_size)
