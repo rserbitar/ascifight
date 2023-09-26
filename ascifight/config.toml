@@ -13,8 +13,8 @@ capture_score = 5
 kill_score = 1
 winning_bonus = 10
 home_flag_required = false
-map_style = 'random'  # Styles: arabia, blood_bath, black_forest, random. (random is random style, not random map)
-walls = 0   # Target integer number of walls (+- symmetries), or floating percentage of walls
+map_style = 'arabia'  # Styles: arabia, blood_bath, black_forest, random. (random is random style, not random map)
+walls = 0  # Target integer number of walls (+- symmetries), or floating percentage of walls
 actors = ["Runner", "Runner", "Runner"]
 
 [[teams]]
