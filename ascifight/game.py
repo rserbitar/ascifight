@@ -135,6 +135,7 @@ class Game:
             actors=config.config["game"]["actors"],
             map_size=config.config["game"]["map_size"],
             walls=config.config["game"]["walls"],
+            map_style=config.config["game"]["map_style"],
         )
         game_board_setup.initialize_map()
         self._set_scores()

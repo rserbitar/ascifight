@@ -1,4 +1,5 @@
 import math
+import typing
 
 from pydantic import ValidationError
 import structlog
@@ -6,6 +7,9 @@ import structlog
 import random
 
 import ascifight.board.data as data
+
+
+MapStyle = typing.Literal['arabia', 'black_forest', 'blood_bath', 'random']
 
 
 class BoardSetup:
@@ -22,6 +26,7 @@ class BoardSetup:
             actors: list[str],
             map_size: int,
             walls: int | float,
+            map_style: MapStyle
     ):
         self._logger = structlog.get_logger()
 
@@ -40,6 +45,10 @@ class BoardSetup:
         self.actor_classes: list[type[data.Actor]] = [
             self.board_data._get_actor(actor) for actor in actors
         ]
+
+        if map_style == 'random':
+            map_style = random.choice(tuple(self.wall_placer.keys()))
+        self.map_style = map_style
 
     def initialize_map(self):
         self.board_data.map_size = self.map_size
@@ -104,7 +113,10 @@ class BoardSetup:
         for actor, coordinates in zip(actors, starting_places):
             self.board_data.actors_coordinates[actor] = coordinates
 
-    def _place_walls(self) -> None:
+    def _place_walls(self):
+        self.wall_placer[self.map_style](self)
+
+    def _place_walls_arabia(self) -> None:
         min_angle = self.base_angle - (math.pi / self.num_players)
         angle_range = (2 * math.pi / self.num_players)
         half_size = self.map_size / 2
@@ -159,3 +171,4 @@ class BoardSetup:
                         if coordinate not in forbidden_positions:
                             self.board_data.walls_coordinates.add(coordinate)
 
+    wall_placer = {'arabia': _place_walls_arabia}
