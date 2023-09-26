@@ -4,7 +4,7 @@ import time
 import httpx
 import vpython
 
-import ascifight.client
+import ascifight.client_lib.client
 import ascifight.util
 
 
@@ -17,7 +17,7 @@ class CachedGameInfo:
 
     def information(self, information):
         return self.api_cache.get(
-            information, ascifight.client.get_information(information)
+            information, ascifight.client_lib.client.get_information(information)
         )
 
 
@@ -316,7 +316,7 @@ def game_loop():
     current_tick = 2**100
     while True:
         try:
-            timing = ascifight.client.get_information("timing")
+            timing = ascifight.client_lib.client.get_information("timing")
             if timing["tick"] != current_tick:
                 if timing["tick"] < current_tick:
                     view3d.reset()
