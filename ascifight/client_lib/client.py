@@ -4,6 +4,7 @@ import time
 
 import ascifight.routers.states
 import ascifight.client_lib.basic as basic
+from ascifight.board.computations import Directions
 
 logger = logging.getLogger()
 
@@ -68,19 +69,19 @@ def execute():
 def get_game_state() -> ascifight.routers.states.StateResponse:
     url = SERVER + "states/game_state"
     response = httpx.get(url)
-    return ascifight.routers.states.StateResponse.model_validate_json(response.json())
+    return ascifight.routers.states.StateResponse.model_validate(response.json())
 
 
 def get_timing() -> ascifight.routers.states.TimingResponse:
     url = SERVER + "states/timing"
     response = httpx.get(url)
-    return ascifight.routers.states.TimingResponse.model_validate_json(response.json())
+    return ascifight.routers.states.TimingResponse.model_validate(response.json())
 
 
-def issue_order(order: str, actor_id: int, direction: str):
+def issue_order(order: str, actor_id: int, direction: Directions):
     httpx.post(
         url=f"{SERVER}orders/{order}/{actor_id}",
-        params={"direction": direction},
+        params={"direction": direction.value},
         auth=(TEAM, PASSWORD),
     )
 
