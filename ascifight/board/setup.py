@@ -8,6 +8,9 @@ import structlog
 import ascifight.board.data as data
 
 
+MapStyle = typing.Literal['arabia', 'blood_bath', 'random']  # todo: 'black_forest'
+
+
 class BoardSetup:
     # Assumptions made in code below:
     #   1. Base angle is between -pi/2 and pi/2 (used when placing walls)
@@ -22,6 +25,7 @@ class BoardSetup:
         actors: list[str],
         map_size: int,
         walls: int | float,
+            map_style: MapStyle
     ):
         self._logger = structlog.get_logger()
 
@@ -40,6 +44,10 @@ class BoardSetup:
         self.actor_classes: list[type[data.Actor]] = [
             self.board_data._get_actor(actor) for actor in actors
         ]
+
+        if map_style == 'random':
+            map_style = random.choice(tuple(self.wall_placer.keys()))
+        self.map_style = map_style
 
     def initialize_map(self):
         self.board_data.map_size = self.map_size
@@ -111,7 +119,14 @@ class BoardSetup:
         for actor, coordinates in zip(actors, starting_places):
             self.board_data.actors_coordinates[actor] = coordinates
 
-    def _place_walls(self) -> None:
+    def _place_walls(self):
+        self.wall_placer[self.map_style](self)
+
+    def _place_walls_arabia(self) -> None:
+        """
+        Random (but mirrored for each team) distribution of walls. self.walls governs the target number (integer) or
+        density (if float between 0 and 1) of wall tiles.
+        """
         min_angle = self.base_angle - (math.pi / self.num_players)
         angle_range = 2 * math.pi / self.num_players
         half_size = self.map_size / 2
@@ -140,7 +155,7 @@ class BoardSetup:
             # is just maths, because you
             # cannot map these symmetries onto discrete squares without any bias.
             angle = random.random() * angle_range + min_angle
-            # The CDF of a square PDF is the square root. Knowing that, we do a Smirnov
+            # The inverse CDF of a linear PDF is the square root. Knowing that, we do a Smirnov
             # transform
             random_distance = math.sqrt(random.random()) * maximum_distance
             for i in range(self.num_players):
@@ -178,3 +193,41 @@ class BoardSetup:
                         coordinate = data.Coordinates(x=x, y=y)
                         if coordinate not in forbidden_positions:
                             self.board_data.walls_coordinates.add(coordinate)
+
+    def _place_walls_blood_bath(self) -> None:
+        """
+        Place solid walls between the bases with a shared path through the center. walls parameter governs the length
+        of the walls (Integer: Absolute length, but be careful about that! Float: Percentage of the map size).
+        """
+        if not self.walls: return
+
+        min_angle = self.base_angle - (math.pi / self.num_players)
+        angle_step = 2 * math.pi / self.num_players
+        half_size = self.map_size / 2
+
+        if 0 < self.walls < 1:
+            wall_length = self.walls * half_size
+        else:
+            wall_length = self.walls
+
+        min_x = int((1 * half_size) - wall_length)
+        max_x = int(1.5 * half_size)
+
+        for x in range(min_x, max_x):
+            for i in range(self.num_players):
+                pos_x = round(x * math.cos(min_angle + i * angle_step) + half_size)
+                pos_y = round(x * math.sin(min_angle + i * angle_step) + half_size)
+                if 0 <= pos_x < self.map_size and 0 <= pos_y < self.map_size:
+                    coordinate = data.Coordinates(x=pos_x, y=pos_y)
+                    self.board_data.walls_coordinates.add(coordinate)
+
+    def _place_walls_black_forest(self) -> None:
+        """
+        Map filled with walls, with a few paths between bases.
+        """
+
+    wall_placer = {'arabia': _place_walls_arabia,
+                   'blood_bath': _place_walls_blood_bath,
+                   # 'black_forest': _place_walls_black_forest
+                   }
+
