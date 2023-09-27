@@ -17,7 +17,7 @@ class CachedGameInfo:
 
     def information(self, information):
         return self.api_cache.get(
-            information, ascifight.client_lib.client.get_information(information)
+            information, ascifight.client_lib.client.get_game_state()
         )
 
 
@@ -316,14 +316,14 @@ def game_loop():
     current_tick = 2**100
     while True:
         try:
-            timing = ascifight.client_lib.client.get_information("timing")
-            if timing["tick"] != current_tick:
-                if timing["tick"] < current_tick:
+            timing = ascifight.client_lib.client.get_timing()
+            if timing.tick != current_tick:
+                if timing.tick < current_tick:
                     view3d.reset()
                 view3d.update()
-                current_tick = timing["tick"]
+                current_tick = timing.tick
 
-            sleep_duration_time = timing["time_to_next_execution"]
+            sleep_duration_time = timing.time_to_next_execution
             if sleep_duration_time >= 0:
                 time.sleep(sleep_duration_time)
         except httpx.ConnectError:
