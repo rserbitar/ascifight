@@ -8,7 +8,7 @@ import structlog
 import ascifight.board.data as data
 
 
-MapStyle = typing.Literal['arabia', 'blood_bath', 'random']  # todo: 'black_forest'
+MapStyle = typing.Literal["arabia", "blood_bath", "random"]  # todo: 'black_forest'
 
 
 class BoardSetup:
@@ -25,7 +25,7 @@ class BoardSetup:
         actors: list[str],
         map_size: int,
         walls: int | float,
-            map_style: MapStyle
+        map_style: MapStyle,
     ):
         self._logger = structlog.get_logger()
 
@@ -45,8 +45,8 @@ class BoardSetup:
             self.board_data._get_actor(actor) for actor in actors
         ]
 
-        if map_style == 'random':
-            map_style = random.choice(tuple(self.wall_placer.keys()))
+        if map_style == "random":
+            map_style = random.choice(tuple(self.wall_placer.keys()))  # type: ignore
         self.map_style = map_style
 
     def initialize_map(self):
@@ -199,7 +199,8 @@ class BoardSetup:
         Place solid walls between the bases with a shared path through the center. walls parameter governs the length
         of the walls (Integer: Absolute length, but be careful about that! Float: Percentage of the map size).
         """
-        if not self.walls: return
+        if not self.walls:
+            return
 
         min_angle = self.base_angle - (math.pi / self.num_players)
         angle_step = 2 * math.pi / self.num_players
@@ -226,8 +227,8 @@ class BoardSetup:
         Map filled with walls, with a few paths between bases.
         """
 
-    wall_placer = {'arabia': _place_walls_arabia,
-                   'blood_bath': _place_walls_blood_bath,
-                   # 'black_forest': _place_walls_black_forest
-                   }
-
+    wall_placer = {
+        "arabia": _place_walls_arabia,
+        "blood_bath": _place_walls_blood_bath,
+        # 'black_forest': _place_walls_black_forest
+    }
