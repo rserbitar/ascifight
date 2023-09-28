@@ -156,9 +156,4 @@ You, and your actors, cant walk through these!
 
 Find a list of endpoints that allow you to play the game below.
 
-
-
-
-
-
 """
