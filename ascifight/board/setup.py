@@ -1,3 +1,4 @@
+import itertools
 import math
 import random
 import typing
@@ -6,9 +7,10 @@ from pydantic import ValidationError
 import structlog
 
 import ascifight.board.data as data
+import ascifight.pixel_draw as pixel_draw
 
 
-MapStyle = typing.Literal["arabia", "blood_bath", "random"]  # todo: 'black_forest'
+MapStyle = typing.Literal['arabia', 'blood_bath', 'black_forest', 'random']
 
 
 class BoardSetup:
@@ -77,12 +79,15 @@ class BoardSetup:
     def _place_bases_and_flags(self) -> None:
         half_size = self.map_size / 2
         minimum_distance = int(half_size / 2)  # At least half map radius from center
+        if self.map_style == 'black_forest':
+            # move bases further out, to avoid wasted space
+            minimum_distance = int(half_size * 0.75)
         maximum_distance = (
             self._maximum_distance() - 2
         )  # At least two distance from border
 
-        # With 2 minimum distance to border and half radius to center, this is
-        # equivalent to a minimum map size of 11
+        # With the settings above, this is equivalent to a minimum map size of 6 (or 9 for black_forest),
+        # though much larger values (20+) are recommended in any case.
         assert maximum_distance > minimum_distance
 
         random_distance = random.randint(minimum_distance, maximum_distance)
@@ -126,6 +131,8 @@ class BoardSetup:
         """
         Random (but mirrored for each team) distribution of walls. self.walls governs the target number (integer) or
         density (if float between 0 and 1) of wall tiles.
+
+        Be careful with high wall densities, as there are no guaranteed paths between bases.
         """
         min_angle = self.base_angle - (math.pi / self.num_players)
         angle_range = 2 * math.pi / self.num_players
@@ -224,11 +231,34 @@ class BoardSetup:
 
     def _place_walls_black_forest(self) -> None:
         """
-        Map filled with walls, with a few paths between bases.
-        """
+        Map filled with walls, with a few paths between bases, one from each base to each other base.
 
-    wall_placer = {
-        "arabia": _place_walls_arabia,
-        "blood_bath": _place_walls_blood_bath,
-        # 'black_forest': _place_walls_black_forest
-    }
+        The walls parameter influences the width of the paths (higher number of walls -> narrower paths) but only
+        slightly. The path width is always between 2 and 5.
+        """
+        forbidden_positions = set()
+        for base_coordinates in self.board_data.bases_coordinates.values():
+            forbidden_positions.update(self._get_area_positions(base_coordinates, 2))
+
+        default_width = 5
+        if 0 < self.walls < 1:
+            width = default_width * (1-self.walls)
+        else:
+            width = default_width - self.walls
+        width = max(2, width)
+
+        for base_coordinate1, base_coordinate2 in itertools.combinations(self.board_data.bases_coordinates.values(), 2):
+
+            path = pixel_draw.line(base_coordinate1, base_coordinate2, width=width)
+            forbidden_positions.update(path)
+
+        for x in range(self.map_size):
+            for y in range(self.map_size):
+                coordinate = data.Coordinates(x=x, y=y)
+                if coordinate not in forbidden_positions:
+                    self.board_data.walls_coordinates.add(coordinate)
+
+    wall_placer = {'arabia': _place_walls_arabia,
+                   'blood_bath': _place_walls_blood_bath,
+                   'black_forest': _place_walls_black_forest
+                   }
