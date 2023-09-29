@@ -3,7 +3,7 @@ import logging
 import time
 
 import ascifight.routers.states
-import ascifight.client_lib.basic as basic
+import ascifight.client_lib.metrics as metrics
 from ascifight.board.computations import Directions
 
 logger = logging.getLogger()
@@ -37,12 +37,14 @@ def execute():
     # if it doesn't have the flag it needs to go to the enemy base
     if not actor.flag:
         # we can calculate the direction of the enemy base or get it from the server
-        direction = basic.destination_direction(
+        direction = metrics.BasicMetric(state).next_direction(
             origin=actor_coordinates, destination=target_coordinates
-        )[0]
+        )
         # we need to stop if we are standing right next to the base
         if (
-            basic.distance(origin=actor_coordinates, destination=target_coordinates)
+            metrics.BasicMetric(state).distance(
+                origin=actor_coordinates, destination=target_coordinates
+            )
             == 1
         ):
             # and grab the flag, the direction is the one we would have walked to
@@ -53,12 +55,17 @@ def execute():
     # if it has the flag we need to head home
     else:
         # where is home?
-        direction = basic.destination_direction(
+        direction = metrics.BasicMetric(state).next_direction(
             origin=actor_coordinates, destination=home_coordinates
-        )[0]
+        )
 
         # if we are already just 1 space apart we are there
-        if basic.distance(origin=actor_coordinates, destination=home_coordinates) == 1:
+        if (
+            metrics.BasicMetric(state).distance(
+                origin=actor_coordinates, destination=home_coordinates
+            )
+            == 1
+        ):
             # we put the flag on our base
             issue_order(order="grabput", actor_id=actor.ident, direction=direction)
         else:
