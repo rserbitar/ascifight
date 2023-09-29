@@ -1,5 +1,5 @@
-import functools
-from typing import Callable
+from collections import defaultdict
+from attr import dataclass
 
 import ascifight.board.data as data
 import ascifight.routers.states as states
@@ -10,6 +10,13 @@ from ascifight.routers.states import (
     FlagDescription,
 )
 from ascifight.board.computations import Directions
+import ascifight.client_lib.metrics as metrics
+
+
+@dataclass
+class Wall:
+    coordinates: data.Coordinates
+
 
 """
 Basic orientation and navigation
@@ -38,68 +45,6 @@ def destination_coordinates(
     return new_coordinates
 
 
-def destination_direction(
-    origin: data.Coordinates,
-    destination: data.Coordinates,
-) -> list[Directions]:
-    """
-    Calculate direction given origin coordinates and destination coordinates.
-    """
-    direction = [Directions.up]
-
-    x, y = distance_vector(origin, destination)
-
-    if abs(x) == abs(y):
-        if x > 0 and y > 0:
-            direction = [Directions.up, Directions.right]
-        elif x > 0 and y < 0:
-            direction = [Directions.right, Directions.down]
-        elif x < 0 and y > 0:
-            direction = [Directions.left, Directions.up]
-        elif x < 0 and y < 0:
-            direction = [Directions.down, Directions.left]
-
-    elif abs(y) > abs(x):
-        if y > 0:
-            direction = [Directions.up]
-        else:
-            direction = [Directions.down]
-    else:
-        if x > 0:
-            direction = [Directions.right]
-        else:
-            direction = [Directions.left]
-
-    return direction
-
-
-"""Basic Metrics"""
-
-
-def distance(
-    origin: data.Coordinates,
-    destination: data.Coordinates,
-    game_state: StateResponse | None = None,
-) -> int:
-    """
-    Calculate the distance in steps between origin and destination coordinates.
-    """
-    x, y = distance_vector(origin, destination)
-    return abs(x) + abs(y)
-
-
-def distance_vector(
-    origin: data.Coordinates,
-    destination: data.Coordinates,
-) -> tuple[int, int]:
-    """
-    Calculate the distance vector between origin and destination coordinates.
-    """
-    x = destination.x - origin.x
-    y = destination.y - origin.y
-    return x, y
-
-
 class Objects:
     """
     Basic objects.
@@ -108,46 +53,67 @@ class Objects:
     def __init__(self, game_state: StateResponse, own_team: str):
         self.game_state = game_state
         self.own_team = own_team
+        self.home_base = self._home_base()
+        self.own_flag = self._own_flag()
+        self.own_actors = self._own_actors()
+        self.enemy_actors = self._enemy_actors()
+        self.walls = self._walls()
+        self.coordinates = self._fill_coordinates()
 
-    @functools.cache
-    def home_base(self) -> BaseDescription:
-        return [base for base in self.game_state.bases if base.team == self.own_team][0]
-
-    @functools.cache
-    def own_flag(self) -> FlagDescription:
-        return [flag for flag in self.game_state.flags if flag.team == self.own_team][0]
-
-    @functools.cache
     def own_actor(self, actor_id: int) -> ActorDescription:
-        return [
+        return next(
             actor
             for actor in self.game_state.actors
             if actor.team == self.own_team and actor.ident == actor_id
-        ][0]
+        )
 
-    @functools.cache
     def enemy_actor(self, actor_id: int, team: str) -> ActorDescription:
-        return [
+        return next(
             actor
             for actor in self.game_state.actors
             if actor.team == team and actor.ident == actor_id
-        ][0]
+        )
 
-    @functools.cache
-    def own_actors(self) -> list[ActorDescription]:
+    def enemy_flag(self, team: str) -> FlagDescription:
+        return next(flag for flag in self.game_state.flags if flag.team == team)
+
+    def enemy_base(self, team: str) -> BaseDescription:
+        return next(base for base in self.game_state.bases if base.team == team)
+
+    def _fill_coordinates(self):
+        coordinates = defaultdict(list)
+        for actor in self.game_state.actors:
+            coordinates[actor.coordinates].append(actor)
+        for flag in self.game_state.flags:
+            coordinates[flag.coordinates].append(flag)
+        for base in self.game_state.bases:
+            coordinates[base.coordinates].append(base)
+        for wall in self.walls:
+            coordinates[wall.coordinates].append(wall)
+        return coordinates
+
+    def _home_base(self) -> BaseDescription:
+        return next(
+            base for base in self.game_state.bases if base.team == self.own_team
+        )
+
+    def _own_flag(self) -> FlagDescription:
+        return next(
+            flag for flag in self.game_state.flags if flag.team == self.own_team
+        )
+
+    def _own_actors(self) -> list[ActorDescription]:
         return [
             actor for actor in self.game_state.actors if actor.team == self.own_team
         ]
 
-    @functools.cache
-    def enemy_actors(self) -> list[ActorDescription]:
+    def _enemy_actors(self) -> list[ActorDescription]:
         return [
             actor for actor in self.game_state.actors if actor.team != self.own_team
         ]
 
-    @functools.cache
-    def walls(self) -> list[data.Coordinates]:
-        return self.game_state.walls
+    def _walls(self):
+        return [Wall(wall) for wall in self.game_state.walls]
 
 
 """
@@ -158,12 +124,12 @@ Basic interactions.
 def get_nearest_coordinates(
     origin: data.Coordinates,
     destinations: list[data.Coordinates],
-    metric: Callable[[data.Coordinates, data.Coordinates, StateResponse], int],
+    metric: type[metrics.Metric],
     game_state: StateResponse,
 ) -> data.Coordinates:
     result = []
     for destination in destinations:
-        dist = metric(origin, destination, game_state)
+        dist = metric(game_state).distance(origin, destination)
         result.append((dist, destination))
     result.sort(key=lambda x: x[0])
     return result[0][1]
@@ -172,9 +138,7 @@ def get_nearest_coordinates(
 def nearest_enemy_coordinates(
     actor: states.ActorDescription,
     game_state: StateResponse,
-    metric: Callable[
-        [data.Coordinates, data.Coordinates, StateResponse], int
-    ] = distance,
+    metric: type[metrics.Metric] = metrics.BasicMetric,
 ) -> data.Coordinates:
     """
     Find the nearest enemy from a given actor.
@@ -196,9 +160,7 @@ def nearest_enemy_coordinates(
 def nearest_enemy_flag_coordinates(
     actor: states.ActorDescription,
     game_state: StateResponse,
-    metric: Callable[
-        [data.Coordinates, data.Coordinates, StateResponse], int
-    ] = distance,
+    metric: type[metrics.Metric] = metrics.BasicMetric,
 ) -> data.Coordinates:
     """
     Find the nearest enemy flag from a given actor.
