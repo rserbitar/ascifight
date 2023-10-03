@@ -25,10 +25,6 @@ tags_metadata = [
         "description": "Operations to provide quality of life support.",
     },
     {
-        "name": "computations",
-        "description": "Computational functions that help to create 'AI' scripts.",
-    },
-    {
         "name": "web-page",
         "description": "Web-pages to display various information.",
     },
