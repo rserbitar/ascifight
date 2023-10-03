@@ -105,6 +105,19 @@ class StateResponse(BaseModel):
     )
 
 
+class CurrentActionsResponse(BaseModel):
+    current_actions: list[ActionDescription] = Field(
+        description="A list of all successfully performed actions in the current tick."
+    )
+
+
+class AllActionsResponse(BaseModel):
+    all_actions: dict[int, list[ActionDescription]] = Field(
+        description="A dictionary with each past tick int he game as key and a list of"
+        "all successfully performed actions as value."
+    )
+
+
 class TimingResponse(BaseModel):
     """Various current timing data."""
 
@@ -165,13 +178,24 @@ async def get_game_state() -> StateResponse:
     return serialize_state(globals.my_game, globals.time_of_next_execution)
 
 
-@router.get("/actions")
-async def get_actions() -> list[ActionDescription]:
+@router.get("/current_actions")
+async def get_current_actions() -> CurrentActionsResponse:
     """
     Returns all actions that have been performed in the current tick.
     This includes only successful actions. Actions that have been tried but
     have not been performed due to various reasons are not shown."""
-    return serialize_actions(globals.my_game.log[globals.my_game.tick])
+    return CurrentActionsResponse(
+        current_actions=serialize_actions(globals.my_game.log[globals.my_game.tick])
+    )
+
+
+@router.get("/all_actions")
+async def get_all_actions() -> AllActionsResponse:
+    """
+    Returns all actions that have been performed in the current tick.
+    This includes only successful actions. Actions that have been tried but
+    have not been performed due to various reasons are not shown."""
+    return AllActionsResponse(all_actions=serialize_all_actions(globals.my_game.log))
 
 
 @router.get("/scores")
@@ -274,6 +298,15 @@ def serialize_actions(actions: list[asci_actions.Action]) -> list[ActionDescript
             target=target,
         )
         result.append(serialized_action)
+    return result
+
+
+def serialize_all_actions(
+    log: dict[int, list[asci_actions.Action]]
+) -> dict[int, list[ActionDescription]]:
+    result: dict[int, list[ActionDescription]] = {}
+    for tick, actions in log.items():
+        result[tick] = serialize_actions(actions)
     return result
 
 
