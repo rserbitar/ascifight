@@ -71,6 +71,7 @@ log_config_dict = {
 flag_icon = "\u25B2"
 base_icon = "\u25D9"
 wall_icon = "\u2588\u2588\u2588"
+death_icon = "\u2620"
 
 colors = {
     0: "\u001b[31m",

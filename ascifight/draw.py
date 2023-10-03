@@ -5,6 +5,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 import ascifight.config as config
 import ascifight.board.data as data
+import ascifight.board.actions as asci_actions
 import ascifight.util as util
 
 
@@ -21,7 +22,7 @@ class Icon(pydantic.BaseModel):
 def draw_objects(
     image_draw,
     icon: Icon,
-    fnt=ImageFont.truetype("FreeMonoBold.ttf", int(factor / 2)),
+    fnt=ImageFont.truetype("DejaVuSansMono-Bold.ttf", int(factor / 2)),
 ):
     image_draw.text(
         (
@@ -34,10 +35,26 @@ def draw_objects(
     )
 
 
+def draw_icons(
+    image_draw,
+    icon: Icon,
+    fnt=ImageFont.truetype("DejaVuSansMono-Bold.ttf", int(factor)),
+):
+    image_draw.text(
+        (
+            3 + icon.coordinates.x * factor,
+            factor * map_size - int(factor * 9 / 8) - icon.coordinates.y * factor,
+        ),
+        icon.name,
+        font=fnt,
+        fill=util.color_rgb_mapping[icon.color],
+    )
+
+
 def draw_annotations(
     image_draw,
     icon: Icon,
-    fnt=ImageFont.truetype("FreeMonoBold.ttf", int(factor / 2)),
+    fnt=ImageFont.truetype("DejaVuSansMono-Bold.ttf", int(factor / 2)),
 ):
     image_draw.text(
         (
@@ -50,10 +67,7 @@ def draw_annotations(
     )
 
 
-def draw_map(
-    icons: list[Icon],
-    annotations: list[Icon],
-) -> bytes:
+def draw_map(objects: list[Icon], annotations: list[Icon], icons: list[Icon]) -> bytes:
     # Create new black image of entire board
     w, h = config.config["game"]["map_size"], config.config["game"]["map_size"]
     img = Image.new("RGB", (w, h), (55, 55, 55))
@@ -68,24 +82,25 @@ def draw_map(
 
     img = img.resize((factor * w, factor * h), Image.NEAREST)
 
-    # get a font
-    fnt = ImageFont.truetype("FreeMonoBold.ttf", int(factor / 2))
-
     # get a drawing context
     d = ImageDraw.Draw(img)
 
     # draw multiline text
     for icon in icons:
-        draw_objects(d, icon, fnt)
+        draw_icons(d, icon)
+    for object in objects:
+        draw_objects(d, object)
     for annotation in annotations:
-        draw_annotations(d, annotation, fnt)
+        draw_annotations(d, annotation)
     # img.save("test.png")
     buf = io.BytesIO()
     img.save(buf, format="png")
     return buf.getvalue()
 
 
-def draw_game_map(board: data.BoardData) -> bytes:
+def draw_game_map(
+    board: data.BoardData, attacks: list[asci_actions.AttackAction]
+) -> bytes:
     actors = [
         Icon(
             name=actor.__class__.__name__[0] + str(actor.ident),
@@ -93,6 +108,14 @@ def draw_game_map(board: data.BoardData) -> bytes:
             color=util.color_names[actor.team.number],
         )
         for actor, coordinates in board.actors_coordinates.items()
+    ]
+    deaths = [
+        Icon(
+            name=util.death_icon,
+            coordinates=attack.destination,
+            color=util.color_names[attack.target.team.number],
+        )
+        for attack in attacks
     ]
     bases = [
         Icon(
@@ -118,7 +141,7 @@ def draw_game_map(board: data.BoardData) -> bytes:
         )
         for flag, coordinates in board.flags_coordinates.items()
     ]
-    return draw_map(actors + bases + walls, flags)
+    return draw_map(actors + bases + walls, flags, deaths)
 
 
 if __name__ == "__main__":
@@ -133,4 +156,4 @@ if __name__ == "__main__":
         Icon(name="\u25B2", coordinates=data.Coordinates(x=2, y=4), color="yellow"),
     ]
 
-    draw_map(icons, annotations)
+    draw_map(icons, annotations, [])

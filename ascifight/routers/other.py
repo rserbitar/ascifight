@@ -6,6 +6,7 @@ from starlette.responses import FileResponse
 import ascifight.config as config
 import ascifight.globals as globals
 import ascifight.draw as draw
+import ascifight.board.actions as asci_actions
 
 router = APIRouter()
 
@@ -34,7 +35,11 @@ async def get_log_files() -> list[str]:
 )
 def get_game_map() -> Response:
     """Returns a png image of the current state of the game."""
-    image = draw.draw_game_map(globals.my_game.board)
+    actions = globals.my_game.log[globals.my_game.tick]
+    attack_actions = [
+        action for action in actions if isinstance(action, asci_actions.AttackAction)
+    ]
+    image = draw.draw_game_map(globals.my_game.board, attack_actions)
     return Response(content=image, media_type="image/png")
 
 
