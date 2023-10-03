@@ -2,102 +2,65 @@ import httpx
 import logging
 import time
 
-import ascifight.routers.states
+import ascifight.client_lib.infra as infra
 import ascifight.client_lib.metrics as metrics
-from ascifight.board.actions import Directions
+import ascifight.client_lib.basic as basic
+
 
 logger = logging.getLogger()
 
-SERVER = "http://127.0.0.1:8000/"
-TEAM = "Team 1"
-PASSWORD = "1"
-
 
 def execute():
+    # necessary infrastructure here, do not change
+    state = infra.get_game_state()
+    team = infra.config["team"]
+    objects = basic.Objects(state, team)
+
     # put your execution code here
-    state = get_game_state()
-    teams = state.teams.copy()
-    # remove our own team from the teams to target
-    teams.remove(TEAM)
-    # this teams flag we want to get
-    target_team = teams[0]
-    # this is the base we need to go to, assuming their flag is there?
-    target_base = [base for base in state.bases if base.team == target_team][0]
-    # these are the bases coordinates
-    target_coordinates = target_base.coordinates
-    # this is our base
-    home_base = [base for base in state.bases if base.team == TEAM][0]
-    # we need the coordinates when we want to go home
-    home_coordinates = home_base.coordinates
-    # we will just use the first of our actors we have
-    # assuming that it will be able to grab the flag
-    actor = [actor for actor in state.actors if actor.team == TEAM][0]
-    # thats where the actor currently is
-    actor_coordinates = actor.coordinates
-    # if it doesn't have the flag it needs to go to the enemy base
-    if not actor.flag:
-        # we can calculate the direction of the enemy base or get it from the server
-        direction = metrics.BasicMetric(state).next_direction(
-            origin=actor_coordinates, destination=target_coordinates
-        )
-        # we need to stop if we are standing right next to the base
-        if (
-            metrics.BasicMetric(state).distance(
-                origin=actor_coordinates, destination=target_coordinates
-            )
-            == 1
-        ):
-            # and grab the flag, the direction is the one we would have walked to
-            issue_order(order="grabput", actor_id=actor.ident, direction=direction)
-        # if we are not there yet we need to go
+
+    # which metric to use for way finding
+    metric_used = metrics.BasicMetric(state)
+    # the actor to use
+    actor = objects.own_actor(0)
+
+    # identifying the target
+    target_flag = basic.nearest_enemy_flag(actor, actor.team, state, metric_used)
+
+    home_base = objects.home_base
+
+    # if we already have the flag
+    if actor.flag == target_flag.team:
+        distance = metric_used.distance(actor.coordinates, home_base.coordinates)
+        direction = metric_used.next_direction(actor.coordinates, home_base.coordinates)
+        # we are further away
+        if distance > 1:
+            infra.issue_order(order="move", actor_id=actor.ident, direction=direction)
+        # we stand right before home base
         else:
-            issue_order(order="move", actor_id=actor.ident, direction=direction)
-    # if it has the flag we need to head home
+            infra.issue_order(
+                order="grabput", actor_id=actor.ident, direction=direction
+            )
+    # we dont have the flag
     else:
-        # where is home?
-        direction = metrics.BasicMetric(state).next_direction(
-            origin=actor_coordinates, destination=home_coordinates
+        distance = metric_used.distance(actor.coordinates, target_flag.coordinates)
+        direction = metric_used.next_direction(
+            actor.coordinates, target_flag.coordinates
         )
-
-        # if we are already just 1 space apart we are there
-        if (
-            metrics.BasicMetric(state).distance(
-                origin=actor_coordinates, destination=home_coordinates
-            )
-            == 1
-        ):
-            # we put the flag on our base
-            issue_order(order="grabput", actor_id=actor.ident, direction=direction)
+        # we are further away
+        if distance > 1:
+            infra.issue_order(order="move", actor_id=actor.ident, direction=direction)
+        # we stand right before enemy flag
         else:
-            # if we are not there we slog on home
-            issue_order(order="move", actor_id=actor.ident, direction=direction)
-
-
-def get_game_state() -> ascifight.routers.states.StateResponse:
-    url = SERVER + "states/game_state"
-    response = httpx.get(url)
-    return ascifight.routers.states.StateResponse.model_validate(response.json())
-
-
-def get_timing() -> ascifight.routers.states.TimingResponse:
-    url = SERVER + "states/timing"
-    response = httpx.get(url)
-    return ascifight.routers.states.TimingResponse.model_validate(response.json())
-
-
-def issue_order(order: str, actor_id: int, direction: Directions):
-    httpx.post(
-        url=f"{SERVER}orders/{order}/{actor_id}",
-        params={"direction": direction.value},
-        auth=(TEAM, PASSWORD),
-    )
+            infra.issue_order(
+                order="grabput", actor_id=actor.ident, direction=direction
+            )
 
 
 def game_loop():
     current_tick = -1
     while True:
         try:
-            timing = get_timing()
+            timing = infra.get_timing()
             # if the game tarted a new tick we need to issue orders
             if timing.tick != current_tick:
                 if timing.tick < current_tick:

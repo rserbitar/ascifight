@@ -52,7 +52,15 @@ class ActionDescription(BaseModel):
     )
 
 
-class BaseDescription(BaseModel):
+class BoardObjectDescription(BaseModel):
+    """An object located on the board."""
+
+    coordinates: data.Coordinates = Field(
+        description="The current coordinates fo the object."
+    )
+
+
+class BaseDescription(BoardObjectDescription):
     """A base that can hold or cap a flag."""
 
     team: str = Field(description="The name of the base's team.")
@@ -61,7 +69,7 @@ class BaseDescription(BaseModel):
     )
 
 
-class WallDescription(BaseModel):
+class WallDescription(BoardObjectDescription):
     """A wall that can not be moved through. Can be built and destroyed"""
 
     coordinates: data.Coordinates = Field(
