@@ -81,26 +81,3 @@ async def get_all_queue_items(
         item = await queue.get()
     queue.task_done()
     return items
-
-
-async def ai_generator():
-    import ascifight.board.computations
-
-    await asyncio.sleep(1)
-    while True:
-        await asyncio.sleep(5)
-        await globals.command_queue.put(
-            game.MoveOrder(
-                team="Team 1",
-                actor=0,
-                direction=ascifight.board.computations.Directions.down,
-            )
-        )
-        await asyncio.sleep(5)
-        await globals.command_queue.put(
-            game.MoveOrder(
-                team="Team 2",
-                actor=0,
-                direction=ascifight.board.computations.Directions.right,
-            )
-        )

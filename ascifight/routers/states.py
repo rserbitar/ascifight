@@ -4,9 +4,11 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 import ascifight.config as config
+import ascifight.game as asci_game
 import ascifight.globals as globals
 import ascifight.board.data as data
 import ascifight.util as util
+import ascifight.board.actions as asci_actions
 
 
 class ActorDescription(BaseModel):
@@ -32,10 +34,36 @@ class FlagDescription(BaseModel):
     )
 
 
+class ActionDescription(BaseModel):
+    type: str = Field(description="The name of the action.")
+    actor: ActorDescription = Field(description="The actor performing the action.")
+    destination: data.Coordinates = Field(
+        description="The coordinates to which the actions where performed."
+    )
+    target: ActorDescription | None = Field(
+        None, description="The actor that was target of the action."
+    )
+    origin: data.Coordinates | None = Field(
+        None, description="The original coordinates in case of a MoveAction."
+    )
+    flag: FlagDescription | None = Field(
+        None,
+        description="The team name of the flag if a flag was involved in the action.",
+    )
+
+
 class BaseDescription(BaseModel):
     """A base that can hold or cap a flag."""
 
     team: str = Field(description="The name of the base's team.")
+    coordinates: data.Coordinates = Field(
+        description="The current coordinates fo the base."
+    )
+
+
+class WallDescription(BaseModel):
+    """A wall that can not be moved through. Can be built and destroyed"""
+
     coordinates: data.Coordinates = Field(
         description="The current coordinates fo the base."
     )
@@ -67,7 +95,7 @@ class StateResponse(BaseModel):
     )
     flags: list[FlagDescription] = Field(description="A list of all flags in the game.")
     bases: list[BaseDescription] = Field(description="A list of all bases in the game.")
-    walls: list[data.Coordinates] = Field(
+    walls: list[WallDescription] = Field(
         description="A list of all walls in the game. Actors can not enter wall fields."
     )
     scores: dict[str, int] = Field(description="A dictionary of the current scores.")
@@ -134,31 +162,16 @@ router = APIRouter(
 async def get_game_state() -> StateResponse:
     """Get the current state of the game including locations of all actors,
     flags, bases and walls."""
-    return StateResponse(
-        teams=[team.name for team in globals.my_game.board.teams],
-        actors=[
-            ActorDescription(
-                type=actor.__class__.__name__,
-                team=actor.team.name,
-                ident=actor.ident,
-                flag=actor.flag.team.name if actor.flag else None,
-                coordinates=coordinates,
-            )
-            for actor, coordinates in globals.my_game.board.actors_coordinates.items()
-        ],
-        flags=[
-            FlagDescription(team=flag.team.name, coordinates=coordinates)
-            for flag, coordinates in globals.my_game.board.flags_coordinates.items()
-        ],
-        bases=[
-            BaseDescription(team=base.team.name, coordinates=coordinates)
-            for base, coordinates in globals.my_game.board.bases_coordinates.items()
-        ],
-        walls=list(globals.my_game.board.walls_coordinates),
-        scores={team.name: score for team, score in globals.my_game.scores.items()},
-        tick=globals.my_game.tick,
-        time_of_next_execution=globals.time_of_next_execution,
-    )
+    return serialize_state(globals.my_game, globals.time_of_next_execution)
+
+
+@router.get("/actions")
+async def get_actions() -> list[ActionDescription]:
+    """
+    Returns all actions that have been performed in the current tick.
+    This includes only successful actions. Actions that have been tried but
+    have not been performed due to various reasons are not shown."""
+    return serialize_actions(globals.my_game.log[globals.my_game.tick])
 
 
 @router.get("/scores")
@@ -208,4 +221,90 @@ async def get_timing() -> TimingResponse:
             globals.time_of_next_execution - datetime.datetime.now()
         ).total_seconds(),
         time_of_next_execution=globals.time_of_next_execution,
+    )
+
+
+def serialize_actor(actor) -> ActorDescription:
+    return ActorDescription(
+        type=actor.__class__.__name__,
+        team=actor.team.name,
+        ident=actor.ident,
+        flag=actor.flag.team.name if actor.flag else None,
+        coordinates=actor.coordinates,
+    )
+
+
+def serialize_flag(flag) -> FlagDescription:
+    return FlagDescription(
+        team=flag.team.name,
+        coordinates=flag.coordinates,
+    )
+
+
+def serialize_actions(actions: list[asci_actions.Action]) -> list[ActionDescription]:
+    result: list[ActionDescription] = []
+    for action in actions:
+        _type = action.__class__.__name__
+        actor = serialize_actor(action.actor)
+        destination = action.destination
+        origin = None
+        flag = None
+        target = None
+        match action:
+            case asci_actions.MoveAction():
+                origin = action.origin
+            case asci_actions.BuildAction():
+                pass
+            case asci_actions.DestroyAction():
+                pass
+            case asci_actions.AttackAction():
+                target = serialize_actor(action.target)
+            case asci_actions.GrabAction():
+                target = serialize_actor(action.target)
+                flag = serialize_flag(action.flag)
+            case asci_actions.PutAction():
+                target = serialize_actor(action.target)
+                flag = serialize_flag(action.flag)
+        serialized_action = ActionDescription(
+            type=_type,
+            actor=actor,
+            destination=destination,
+            origin=origin,
+            flag=flag,
+            target=target,
+        )
+        result.append(serialized_action)
+    return result
+
+
+def serialize_state(
+    game: asci_game.Game, time_of_next_execution: datetime.datetime
+) -> StateResponse:
+    return StateResponse(
+        teams=[team.name for team in game.board.teams],
+        actors=[
+            ActorDescription(
+                type=actor.__class__.__name__,
+                team=actor.team.name,
+                ident=actor.ident,
+                flag=actor.flag.team.name if actor.flag else None,
+                coordinates=coordinates,
+            )
+            for actor, coordinates in game.board.actors_coordinates.items()
+        ],
+        flags=[
+            FlagDescription(team=flag.team.name, coordinates=coordinates)
+            for flag, coordinates in game.board.flags_coordinates.items()
+        ],
+        bases=[
+            BaseDescription(team=base.team.name, coordinates=coordinates)
+            for base, coordinates in game.board.bases_coordinates.items()
+        ],
+        walls=[
+            WallDescription(coordinates=coordinates)
+            for coordinates in game.board.walls_coordinates
+        ],
+        scores={team.name: score for team, score in game.scores.items()},
+        tick=game.tick,
+        time_of_next_execution=time_of_next_execution,
     )

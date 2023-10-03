@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 import ascifight.board.data as data
 from ascifight.routers.states import StateResponse
 
-from ascifight.board.computations import Directions
+from ascifight.board.actions import Directions
 
 
 class Metric(ABC):

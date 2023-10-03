@@ -84,8 +84,9 @@ class AsciFight3D:
 
     def fix_text_alignment_errors(self):
         """
-        For an unknown reason, vpython.text flips out if the last created compound had an origin other than (0,0,0)
-        and totally botches the texts position. Thus, before we create any new texts, we create this invisible
+        For an unknown reason, vpython.text flips out if the last created compound had
+        an origin other than (0,0,0) and totally botches the texts position. Thus,
+        before we create any new texts, we create this invisible
         compound that we then delete immediately. This somehow fixes the issue.
         """
         error_fix_box = vpython.box(size=vpython.vector(0.1, 0.1, 0.1))
@@ -158,8 +159,8 @@ Touch screen: pinch/extend to zoom, swipe or two-finger rotate."""
             depth=0.1,
             text="Y",
         )
-        self.static_vobjects[f"label_x"] = label_x
-        self.static_vobjects[f"label_y"] = label_y
+        self.static_vobjects["label_x"] = label_x
+        self.static_vobjects["label_y"] = label_y
 
     def move_vobject(self, object_id, pos):
         if object_id in self.dynamic_vobjects:

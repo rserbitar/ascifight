@@ -10,8 +10,11 @@ from ascifight.board.data import Coordinates
 width_type: typing.TypeAlias = typing.Annotated[float, annotated_types.Ge(1)]
 
 
-def line(start: Coordinates, end: Coordinates, width: width_type = 1) -> set[Coordinates]:
-    # There are some irregularities going on at certain parameter pairings, that I cannot track down. Maybe there
+def line(
+    start: Coordinates, end: Coordinates, width: width_type = 1
+) -> set[Coordinates]:
+    # There are some irregularities going on at certain parameter pairings,
+    # that I cannot track down. Maybe there
     # is something wrong with the algorithm? Algorithm is a simplified version of
     # http://kt8216.unixcab.org/murphy/index.html
     # Anyway, it works great for most combinations that you will encounter.
@@ -142,13 +145,28 @@ def _x_line(x0, y0, dx, dy, x_step, y_step, width, perp_x_step, perp_y_step):
     width *= 2 * D
     line = set()
     for p in range(length):
-        line.update(_x_perp_line(x, y, dx, dy, perp_x_step, perp_y_step, perp_error, width, error))
+        line.update(
+            _x_perp_line(
+                x, y, dx, dy, perp_x_step, perp_y_step, perp_error, width, error
+            )
+        )
         if error > threshold:
             y += y_step
             error += e_diag
             if perp_error >= threshold:
                 line.update(
-                    _x_perp_line(x, y, dx, dy, perp_x_step, perp_y_step, perp_error + e_diag + e_square, width, error))
+                    _x_perp_line(
+                        x,
+                        y,
+                        dx,
+                        dy,
+                        perp_x_step,
+                        perp_y_step,
+                        perp_error + e_diag + e_square,
+                        width,
+                        error,
+                    )
+                )
                 perp_error += e_diag
             perp_error += e_square
         error += e_square
@@ -169,13 +187,28 @@ def _y_line(x0, y0, dx, dy, x_step, y_step, width, perp_x_step, perp_y_step):
     width *= 2 * D
     line = set()
     for p in range(length):
-        line.update(_y_perp_line(x, y, dx, dy, perp_x_step, perp_y_step, perp_error, width, error))
+        line.update(
+            _y_perp_line(
+                x, y, dx, dy, perp_x_step, perp_y_step, perp_error, width, error
+            )
+        )
         if error > threshold:
             x += x_step
             error += e_diag
             if perp_error >= threshold:
                 line.update(
-                    _y_perp_line(x, y, dx, dy, perp_x_step, perp_y_step, perp_error + e_diag + e_square, width, error))
+                    _y_perp_line(
+                        x,
+                        y,
+                        dx,
+                        dy,
+                        perp_x_step,
+                        perp_y_step,
+                        perp_error + e_diag + e_square,
+                        width,
+                        error,
+                    )
+                )
                 perp_error += e_diag
             perp_error += e_square
         error += e_square

@@ -4,7 +4,7 @@ import time
 
 import ascifight.routers.states
 import ascifight.client_lib.metrics as metrics
-from ascifight.board.computations import Directions
+from ascifight.board.actions import Directions
 
 logger = logging.getLogger()
 

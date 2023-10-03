@@ -17,7 +17,6 @@ import ascifight.routers.orders as orders
 import ascifight.routers.states as states
 import ascifight.routers.other as other
 import ascifight.routers.router_utils as router_utils
-import ascifight.routers.computations as computations
 
 import ascifight.util as util
 import ascifight.game_loop as game_loop
@@ -64,7 +63,6 @@ app = FastAPI(
 app.include_router(orders.router)
 app.include_router(states.router)
 app.include_router(other.router)
-app.include_router(computations.router)
 app.mount(
     "/logs", StaticFiles(directory=config.config["server"]["log_dir"]), name="logs"
 )

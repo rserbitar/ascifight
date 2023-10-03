@@ -63,7 +63,7 @@ class BoardSetup:
         for team in self.teams:
             for number, actor_class in enumerate(self.actor_classes):
                 self.board_data.teams_actors[(team, number)] = actor_class(
-                    ident=number, team=team
+                    ident=number, team=team, board=self.board_data
                 )
             coordinates = self.board_data.bases_coordinates[data.Base(team=team)]
             actors = [

@@ -1,3 +1,4 @@
+from collections import defaultdict
 from pydantic import BaseModel, Field
 from typing import TypeVar
 import structlog
@@ -8,8 +9,7 @@ import ascifight.config as config
 import ascifight.util as util
 import ascifight.board.data as data
 import ascifight.board.setup as setup
-import ascifight.board.actions as actions
-import ascifight.board.computations as computations
+import ascifight.board.actions as asci_actions
 
 
 T = TypeVar("T")
@@ -28,7 +28,7 @@ class AttackOrder(Order):
         ge=0,
         le=len(config.config["game"]["actors"]) - 1,
     )
-    direction: computations.Directions = Field(
+    direction: asci_actions.Directions = Field(
         title="Direction",
         description="The direction to attack from the position of the actor.",
     )
@@ -43,7 +43,7 @@ class MoveOrder(Order):
         ge=0,
         le=len(config.config["game"]["actors"]) - 1,
     )
-    direction: computations.Directions = Field(
+    direction: asci_actions.Directions = Field(
         title="Direction",
         description=(
             "The direction to move to from the position of the actor. 'up' "
@@ -62,7 +62,7 @@ class GrabPutOrder(Order):
         ge=0,
         le=len(config.config["game"]["actors"]) - 1,
     )
-    direction: computations.Directions = Field(
+    direction: asci_actions.Directions = Field(
         title="Direction",
         description=(
             "The direction to grab of put the flag from the position of the actor. "
@@ -79,7 +79,7 @@ class BuildOrder(Order):
         ge=0,
         le=len(config.config["game"]["actors"]) - 1,
     )
-    direction: computations.Directions = Field(
+    direction: asci_actions.Directions = Field(
         title="Direction",
         description="The direction to build from the position of the actor.",
     )
@@ -94,7 +94,7 @@ class DestroyOrder(Order):
         ge=0,
         le=len(config.config["game"]["actors"]) - 1,
     )
-    direction: computations.Directions = Field(
+    direction: asci_actions.Directions = Field(
         title="Direction",
         description="The direction to destroy from the position of the actor.",
     )
@@ -115,13 +115,14 @@ class Game:
         max_score: int = config.config["game"]["max_score"],
     ) -> None:
         self.logger = structlog.get_logger()
+        self.log: defaultdict[int, list[asci_actions.Action]] = defaultdict(list)
         self.score_file: str = score_file
         self.capture_score: int = capture_score
         self.kill_score: int = kill_score
         self.winning_bonus: int = winning_bonus
 
         self.board = game_board
-        self.board_actions = actions.BoardActions(self.board)
+        self.board_actions = asci_actions.BoardActions(self.board)
         self.scores: dict[data.Team, int] = {}
         self.overall_scores: dict[data.Team, int] = {}
         self.tick = 0
@@ -257,9 +258,13 @@ class Game:
                 self.logger.warning(f"{actor} already moved this tick.")
             else:
                 # if the actor can move
-                already_moved[actor], team_that_captured = self.board_actions.move(
-                    actor, direction
-                )
+                (
+                    already_moved[actor],
+                    team_that_captured,
+                    action,
+                ) = self.board_actions.move(actor, direction)
+                if action:
+                    self.log[self.tick].append(action)
                 if team_that_captured:
                     self.scores[team_that_captured] += self.capture_score
 
@@ -277,11 +282,14 @@ class Game:
             if already_attacked[actor]:
                 self.logger.warning(f"{actor} already attacked this tick.")
             else:
-                already_attacked[actor], team_that_killed = self.board_actions.attack(
-                    actor, order.direction
-                )
-                if team_that_killed:
+                (
+                    already_attacked[actor],
+                    team_that_killed,
+                    action,
+                ) = self.board_actions.attack(actor, order.direction)
+                if action and team_that_killed:
                     self.scores[team_that_killed] += self.kill_score
+                    self.log[self.tick].append(action)
 
         unbind_contextvars("team")
 
@@ -297,9 +305,13 @@ class Game:
                 (
                     already_grabbed[actor],
                     team_that_captured,
+                    action,
                 ) = self.board_actions.grabput_flag(actor, order.direction)
+                if action:
+                    self.log[self.tick].append(action)
                 if team_that_captured:
                     self.scores[team_that_captured] += self.capture_score
+
             else:
                 self.logger.warning(f"{actor} already grabbed this tick.")
         unbind_contextvars("team")
@@ -316,9 +328,11 @@ class Game:
             if already_destroyed[actor]:
                 self.logger.warning(f"{actor} already destroyed this tick.")
             else:
-                already_destroyed[actor] = self.board_actions.destroy(
+                already_destroyed[actor], action = self.board_actions.destroy(
                     actor, order.direction
                 )
+                if action:
+                    self.log[self.tick].append(action)
 
         unbind_contextvars("team")
 
@@ -334,7 +348,11 @@ class Game:
             if already_built[actor]:
                 self.logger.warning(f"{actor} already built this tick.")
             else:
-                already_built[actor] = self.board_actions.build(actor, order.direction)
+                already_built[actor], action = self.board_actions.build(
+                    actor, order.direction
+                )
+                if action:
+                    self.log[self.tick].append(action)
 
         unbind_contextvars("team")
 

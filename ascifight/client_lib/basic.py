@@ -1,5 +1,4 @@
 from collections import defaultdict
-from attr import dataclass
 
 import ascifight.board.data as data
 import ascifight.routers.states as states
@@ -8,14 +7,10 @@ from ascifight.routers.states import (
     StateResponse,
     ActorDescription,
     FlagDescription,
+    WallDescription,
 )
-from ascifight.board.computations import Directions
+from ascifight.board.actions import Directions
 import ascifight.client_lib.metrics as metrics
-
-
-@dataclass
-class Wall:
-    coordinates: data.Coordinates
 
 
 """
@@ -112,8 +107,8 @@ class Objects:
             actor for actor in self.game_state.actors if actor.team != self.own_team
         ]
 
-    def _walls(self):
-        return [Wall(wall) for wall in self.game_state.walls]
+    def _walls(self) -> list[WallDescription]:
+        return [wall for wall in self.game_state.walls]
 
 
 """

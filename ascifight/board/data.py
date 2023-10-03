@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import abc
 import sys
 import itertools
 import typing
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 import structlog
 
 import ascifight.config as config
@@ -89,8 +91,10 @@ class Flag(BoardObject):
 
 
 class Actor(BoardObject, abc.ABC):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     ident: int
     team: Team
+    board: BoardData
     grab: typing.ClassVar[float] = 0.0
     attack: typing.ClassVar[float] = 0.0
     build: typing.ClassVar[float] = 0.0
@@ -121,6 +125,10 @@ class Actor(BoardObject, abc.ABC):
             build=cls.build,
             destroy=cls.destroy,
         )
+
+    @property
+    def coordinates(self) -> Coordinates:
+        return self.board.actors_coordinates[self]
 
 
 class Generalist(Actor):

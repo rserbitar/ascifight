@@ -4,9 +4,11 @@ from typing import Annotated
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi import Depends, HTTPException, status, Query, Path, Body
 
+
 import ascifight.config as config
 import ascifight.board.data as data
-import ascifight.board.computations as computations
+import ascifight.board.actions as asci_actions
+
 
 security = HTTPBasic()
 
@@ -69,7 +71,7 @@ actor_annotation = Annotated[
 ]
 
 direction_annotation = Annotated[
-    computations.Directions,
+    asci_actions.Directions,
     Query(
         title="Direction",
         description="The direction the actor should perform the action to.",

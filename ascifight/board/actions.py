@@ -1,76 +1,91 @@
+from dataclasses import dataclass
 from pydantic import ValidationError
 import toml
 import structlog
+import enum
 
 import random
 
 
 import ascifight.board.data as data
-import ascifight.board.computations as computations
+
+
+class Directions(str, enum.Enum):
+    left = "left"
+    right = "right"
+    down = "down"
+    up = "up"
+
+
+@dataclass
+class Action:
+    actor: data.Actor
+    destination: data.Coordinates
+
+
+@dataclass
+class AttackAction(Action):
+    target: data.Actor
+
+
+@dataclass
+class MoveAction(Action):
+    origin: data.Coordinates
+
+
+@dataclass
+class GrabAction(Action):
+    flag: data.Flag
+    target: data.Actor | None = None
+
+
+@dataclass
+class PutAction(Action):
+    flag: data.Flag
+    target: data.Actor | None = None
+
+
+@dataclass
+class DestroyAction(Action):
+    pass
+
+
+@dataclass
+class BuildAction(Action):
+    pass
 
 
 class BoardActions:
-    def __init__(
-        self,
-        game_board_data: data.BoardData,
-    ):
+    def __init__(self, game_board_data: data.BoardData):
         self._logger = structlog.get_logger()
         self.board_data: data.BoardData = game_board_data
         with open("config.toml", mode="r") as fp:
             self.config = toml.load(fp)
 
-    def calc_target_coordinates(
-        self,
-        origin: data.Actor | data.Coordinates,
-        direction: computations.Directions,
-    ) -> data.Coordinates:
-        coordinates = (
-            origin
-            if isinstance(origin, data.Coordinates)
-            else self.board_data.actors_coordinates[origin]
-        )
-        return computations.calc_target_coordinates(
-            coordinates, direction, self.board_data.map_size
-        )
-
-    def calc_target_direction(
-        self,
-        origin: data.BoardObject | data.Coordinates,
-        target: data.BoardObject | data.Coordinates,
-    ) -> list[computations.Directions]:
-        origin_coordinates = (
-            origin
-            if isinstance(origin, data.Coordinates)
-            else self.board_data.board_objects_coordinates(origin)
-        )
-        target_coordinates = (
-            target
-            if isinstance(target, data.Coordinates)
-            else self.board_data.board_objects_coordinates(target)
-        )
-        return computations.calc_target_coordinate_direction(
-            origin=origin_coordinates, target=target_coordinates
-        )
-
     def move(
-        self, actor: data.Actor, direction: computations.Directions
-    ) -> tuple[bool, None | data.Team]:
+        self, actor: data.Actor, direction: Directions
+    ) -> tuple[bool, data.Team | None, MoveAction | None]:
         team_that_captured = None
-        new_coordinates = self.calc_target_coordinates(actor, direction)
+        new_coordinates = self._calc_target_coordinates(actor, direction)
+        origin = actor.coordinates
         moved = self._try_put_actor(actor, new_coordinates)
+        action: MoveAction | None = None
         if moved:
             team_that_captured = self._check_flag_return_conditions(actor)
-        return moved, team_that_captured
+
+            action = MoveAction(actor=actor, origin=origin, destination=new_coordinates)
+        return moved, team_that_captured, action
 
     def attack(
-        self, actor: data.Actor, direction: computations.Directions
-    ) -> tuple[bool, None | data.Team]:
+        self, actor: data.Actor, direction: Directions
+    ) -> tuple[bool, data.Team | None, AttackAction | None]:
         attacked = False
+        action: AttackAction | None = None
         team_that_killed = None
         if not actor.attack:
             self._logger.warning(f"{actor} can not attack.")
         else:
-            target_coordinates = self.calc_target_coordinates(actor, direction)
+            target_coordinates = self._calc_target_coordinates(actor, direction)
             target = self.board_data.coordinates_actors.get(target_coordinates)
             if target is None:
                 self._logger.warning(
@@ -85,14 +100,20 @@ class BoardActions:
                     self._logger.info(f"{actor} attacked and hit {target}.")
                     self._respawn(target)
                     team_that_killed = actor.team
-        return attacked, team_that_killed
+                    action = AttackAction(
+                        actor=actor, target=target, destination=target_coordinates
+                    )
+        return attacked, team_that_killed, action
 
-    def build(self, actor: data.Actor, direction: computations.Directions) -> bool:
+    def build(
+        self, actor: data.Actor, direction: Directions
+    ) -> tuple[bool, BuildAction | None]:
         built = False
+        action: BuildAction | None = None
         if not actor.build:
             self._logger.warning(f"{actor} can not build.")
         else:
-            target_coordinates = self.calc_target_coordinates(actor, direction)
+            target_coordinates = self._calc_target_coordinates(actor, direction)
             illegal_target = (
                 self.board_data.coordinates_actors.get(target_coordinates)
                 or self.board_data.coordinates_bases.get(target_coordinates)
@@ -110,15 +131,19 @@ class BoardActions:
                     self._logger.info(
                         f"{actor} successfully built a wall at {target_coordinates}."
                     )
+                    action = BuildAction(actor=actor, destination=target_coordinates)
                     self.board_data.walls_coordinates.add(target_coordinates)
-        return built
+        return built, action
 
-    def destroy(self, actor: data.Actor, direction: computations.Directions) -> bool:
+    def destroy(
+        self, actor: data.Actor, direction: Directions
+    ) -> tuple[bool, DestroyAction | None]:
         destroyed = False
+        action: DestroyAction | None = None
         if not actor.destroy:
             self._logger.warning(f"{actor} can not destroy.")
         else:
-            target_coordinates = self.calc_target_coordinates(actor, direction)
+            target_coordinates = self._calc_target_coordinates(actor, direction)
             target = target_coordinates in self.board_data.walls_coordinates
             if not target:
                 self._logger.warning("Target field does not contain a wall.")
@@ -132,15 +157,16 @@ class BoardActions:
                         f"{actor} successfully destroyed a wall at "
                         f" {target_coordinates}."
                     )
+                    action = DestroyAction(actor=actor, destination=target_coordinates)
                     self.board_data.walls_coordinates.remove(target_coordinates)
-        return destroyed
+        return destroyed, action
 
     def grabput_flag(
-        self, actor: data.Actor, direction: computations.Directions
-    ) -> tuple[bool, None | data.Team]:
+        self, actor: data.Actor, direction: Directions
+    ) -> tuple[bool, None | data.Team, GrabAction | PutAction | None]:
         team_that_captured = None
-        target_coordinates = self.calc_target_coordinates(actor, direction)
-
+        target_coordinates = self._calc_target_coordinates(actor, direction)
+        action: GrabAction | PutAction | None = None
         grab_successful = random.random() < actor.grab
         target_actor = self.board_data.coordinates_actors.get(target_coordinates)
         already_grabbed = False
@@ -171,6 +197,12 @@ class BoardActions:
                     team_that_captured = self._check_flag_return_conditions(
                         target_actor
                     )
+                    action = PutAction(
+                        actor=actor,
+                        target=target_actor,
+                        destination=target_coordinates,
+                        flag=flag,
+                    )
 
             # no target actor, means empty field, wall or base (even a flag???)
             else:
@@ -186,7 +218,9 @@ class BoardActions:
                         f"{actor} put the flag to coordinates {target_coordinates}."
                     )
                     team_that_captured = self._check_capture_conditions(flag)
-
+                    action = PutAction(
+                        actor=actor, destination=target_coordinates, flag=flag
+                    )
         # the actor does not have the flag
         else:
             flag = self.board_data.coordinates_flags.get(target_coordinates)
@@ -194,9 +228,7 @@ class BoardActions:
                 self._logger.warning(f"No flag at coordinates {target_coordinates}.")
             else:
                 if grab_successful:
-                    self.board_data.flags_coordinates[
-                        flag
-                    ] = self.board_data.actors_coordinates[actor]
+                    self.board_data.flags_coordinates[flag] = actor.coordinates
                     actor.flag = flag
                     already_grabbed = True
 
@@ -207,13 +239,42 @@ class BoardActions:
                             f"{actor} grabbed the flag of {flag.team} from "
                             "{target_actor}."
                         )
+                        action = GrabAction(
+                            actor=actor,
+                            destination=target_coordinates,
+                            target=target_actor,
+                            flag=flag,
+                        )
                     else:
                         self._logger.info(f"{actor} grabbed the flag of {flag.team}.")
+                        action = GrabAction(
+                            actor=actor,
+                            destination=target_coordinates,
+                            flag=flag,
+                        )
                     team_that_captured = self._check_flag_return_conditions(actor=actor)
                 else:
                     self._logger.info(f"{actor} grabbed and missed the flag.")
 
-        return already_grabbed, team_that_captured
+        return already_grabbed, team_that_captured, action
+
+    def _calc_target_coordinates(
+        self,
+        actor: data.Actor,
+        direction: Directions,
+    ) -> data.Coordinates:
+        coordinates = actor.coordinates
+        new_coordinates = data.Coordinates(x=coordinates.x, y=coordinates.y)
+        match direction:
+            case direction.right:
+                new_coordinates.x = min(coordinates.x + 1, self.board_data.map_size - 1)
+            case direction.left:
+                new_coordinates.x = max(coordinates.x - 1, 0)
+            case direction.up:
+                new_coordinates.y = min(coordinates.y + 1, self.board_data.map_size - 1)
+            case direction.down:
+                new_coordinates.y = max(coordinates.y - 1, 0)
+        return new_coordinates
 
     def _check_capture_conditions(
         self, flag_to_capture: data.Flag | None = None
@@ -280,7 +341,7 @@ class BoardActions:
 
     def _check_flag_return_conditions(self, actor: data.Actor) -> data.Team | None:
         team_that_captured = None
-        coordinates = self.board_data.actors_coordinates[actor]
+        coordinates = actor.coordinates
         if coordinates in self.board_data.flags_coordinates.values():
             flag = self.board_data.coordinates_flags[coordinates]
             # if flag is own flag, return it to base
@@ -321,7 +382,7 @@ class BoardActions:
     def _try_put_actor(
         self, actor: data.Actor, new_coordinates: data.Coordinates
     ) -> bool:
-        coordinates = self.board_data.actors_coordinates[actor]
+        coordinates = actor.coordinates
         moved = False
 
         if coordinates == new_coordinates:
