@@ -22,7 +22,7 @@ def execute():
     # put your execution code here
 
     # which metric to use for way finding
-    metric_used = metrics.DijkstraMetric(objects, avoid_actors=False)
+    metric_used = metrics.DijkstraMetric(objects)
     # the actor to use
     actor = objects.own_actor(0)
 

@@ -41,6 +41,7 @@ class Metric(ABC):
         else:
             result = self._path(origin, destination)
             self.paths[(origin, destination)] = result
+        print(origin, destination, result)
         return result
 
     def next_direction(
@@ -73,7 +74,6 @@ class Metric(ABC):
     def _path(self, origin: Coordinates, destination: Coordinates) -> list[Coordinates]:
         path: list[Coordinates] = [destination]
         distance_field = self.distance_field(origin)
-        print(distance_field)
         next = destination
         while next != origin:
             neighbors = self._neighbors(path[-1])
@@ -150,7 +150,7 @@ class DijkstraMetric(Metric):
             for actor in objects.own_actors + objects.enemy_actors:
                 self.blockers.append(actor.coordinates)
         if avoid_bases:
-            for base in objects.enemy_bases + objects.enemy_actors:
+            for base in objects.enemy_bases + [objects.home_base]:
                 self.blockers.append(base.coordinates)
         map_size = objects.rules.map_size
         self.grid: dijkstra.GridWithWeights = dijkstra.GridWithWeights(
@@ -161,13 +161,22 @@ class DijkstraMetric(Metric):
         came_from, distance_field = dijkstra.dijkstra_search(self.grid, origin, None)
         return distance_field
 
-    def _neighbors(self, coordinates: Coordinates) -> list[Coordinates]:
-        (x, y) = coordinates.x, coordinates.y
-        coords = filter(
-            self._in_bounds, [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
+    def _path(self, origin: Coordinates, destination: Coordinates) -> list[Coordinates]:
+        unblock = False
+        if destination in self.blockers:
+            self.blockers.remove(destination)
+            unblock = True
+        came_from, cost_so_far = dijkstra.dijkstra_search(
+            self.grid, origin, destination
         )
-        coords = filter(self._passable, coords)
-        return [Coordinates(x=x, y=y) for x, y in coords]
-
-    def _passable(self, coordinates: tuple[int, int]) -> bool:
-        return Coordinates(x=coordinates[0], y=coordinates[1]) not in self.blockers
+        path = dijkstra.reconstruct_path(came_from, start=origin, goal=destination)
+        dijkstra.draw_grid(
+            self.grid,
+            path=dijkstra.reconstruct_path(came_from, start=origin, goal=destination),
+            number=cost_so_far,
+            start=origin,
+            goal=destination,
+        )
+        if unblock:
+            self.blockers.append(destination)
+        return [i for i in path if i is not None]
