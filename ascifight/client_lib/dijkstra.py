@@ -17,12 +17,12 @@ class GridWithWeights:
         self,
         width: int,
         height: int,
-        walls: list[Coordinates] = [],
+        blockers: list[Coordinates] = [],
         weights: dict[Coordinates, float] = {},
     ):
         self.width = width
         self.height = height
-        self.walls = walls
+        self.walls = blockers
         self.weights = weights
 
     def passable(self, id: Coordinates) -> bool:
@@ -177,7 +177,7 @@ if __name__ == "__main__":
     diagram = GridWithWeights(
         10,
         10,
-        walls=[
+        blockers=[
             Coordinates(x=3, y=3),
             Coordinates(x=5, y=6),
             Coordinates(x=6, y=7),

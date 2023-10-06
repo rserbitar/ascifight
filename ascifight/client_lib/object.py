@@ -26,6 +26,7 @@ class Objects:
         self.own_actors = self._own_actors()
         self.enemy_actors = self._enemy_actors()
         self.enemy_flags = self._enemy_flags()
+        self.enemy_bases = self._enemy_bases()
         self.walls = self._walls()
         self.coordinates_objects = self._fill_coordinates()
 
@@ -107,3 +108,6 @@ class Objects:
 
     def _walls(self) -> list[WallDescription]:
         return [wall for wall in self.game_state.walls]
+
+    def _enemy_bases(self) -> list[BaseDescription]:
+        return [base for base in self.game_state.bases if base.team != self.own_team]

@@ -4,6 +4,7 @@ from ascifight.board.data import Coordinates
 from ascifight.client_lib.object import Objects
 
 from ascifight.board.actions import Directions
+import ascifight.client_lib.dijkstra as dijkstra
 
 
 class Metric(ABC):
@@ -72,6 +73,7 @@ class Metric(ABC):
     def _path(self, origin: Coordinates, destination: Coordinates) -> list[Coordinates]:
         path: list[Coordinates] = [destination]
         distance_field = self.distance_field(origin)
+        print(distance_field)
         next = destination
         while next != origin:
             neighbors = self._neighbors(path[-1])
@@ -83,7 +85,7 @@ class Metric(ABC):
         path.reverse()
         return path
 
-    def _in_bounds(self, coordinates) -> bool:
+    def _in_bounds(self, coordinates: tuple[int, int]) -> bool:
         x, y = coordinates
         map_size = self.objects.rules.map_size
         return 0 <= x < map_size and 0 <= y < map_size
@@ -128,3 +130,44 @@ class BasicMetric(Metric):
         x = destination.x - origin.x
         y = destination.y - origin.y
         return x, y
+
+
+class DijkstraMetric(Metric):
+    def __init__(
+        self,
+        objects: Objects,
+        blockers: list[Coordinates] | None = None,
+        avoid_walls: bool = True,
+        avoid_actors: bool = True,
+        avoid_bases: bool = True,
+    ) -> None:
+        super().__init__(objects)
+        self.blockers = blockers if blockers else []
+        if avoid_walls:
+            for wall in objects.walls:
+                self.blockers.append(wall.coordinates)
+        if avoid_actors:
+            for actor in objects.own_actors + objects.enemy_actors:
+                self.blockers.append(actor.coordinates)
+        if avoid_bases:
+            for base in objects.enemy_bases + objects.enemy_actors:
+                self.blockers.append(base.coordinates)
+        map_size = objects.rules.map_size
+        self.grid: dijkstra.GridWithWeights = dijkstra.GridWithWeights(
+            height=map_size, width=map_size, blockers=self.blockers
+        )
+
+    def _distance_field(self, origin: Coordinates) -> dict[Coordinates, float]:
+        came_from, distance_field = dijkstra.dijkstra_search(self.grid, origin, None)
+        return distance_field
+
+    def _neighbors(self, coordinates: Coordinates) -> list[Coordinates]:
+        (x, y) = coordinates.x, coordinates.y
+        coords = filter(
+            self._in_bounds, [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
+        )
+        coords = filter(self._passable, coords)
+        return [Coordinates(x=x, y=y) for x, y in coords]
+
+    def _passable(self, coordinates: tuple[int, int]) -> bool:
+        return Coordinates(x=coordinates[0], y=coordinates[1]) not in self.blockers
