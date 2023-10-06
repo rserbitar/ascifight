@@ -4,6 +4,7 @@ import abc
 import sys
 import itertools
 import typing
+from functools import total_ordering
 
 from pydantic import BaseModel, Field, ConfigDict
 import structlog
@@ -27,6 +28,7 @@ class Team(BaseModel):
         return f"Team {self.name}"
 
 
+@total_ordering
 class Coordinates(BaseModel):
     x: int = Field(
         description="X coordinate is decreased by the 'left' and increased by the"
@@ -50,6 +52,21 @@ class Coordinates(BaseModel):
             and self.x == another.x
             and hasattr(another, "y")
             and self.y == another.y
+        )
+
+    def __ne__(self, another):
+        return (
+            hasattr(another, "x")
+            and hasattr(another, "y")
+            and (self.x != another.x or self.y != another.y)
+        )
+
+    def __lt__(self, another):
+        return (
+            hasattr(another, "x")
+            and hasattr(another, "y")
+            and self.x * self.x + self.y * self.y
+            > another.x * another.x + another.y * another.y
         )
 
     def __hash__(self) -> int:
