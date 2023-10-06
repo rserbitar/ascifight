@@ -25,12 +25,12 @@ class GridWithWeights:
         self.walls = walls
         self.weights = weights
 
-    def in_bounds(self, coords) -> bool:
-        x, y = coords
-        return 0 <= x < self.width and 0 <= y < self.height
-
     def passable(self, id: Coordinates) -> bool:
         return id not in self.walls
+
+    def in_bounds(self, coordinates) -> bool:
+        x, y = coordinates
+        return 0 <= x < self.width and 0 <= y < self.height
 
     def neighbors(self, id: Coordinates) -> filter[Coordinates]:
         (x, y) = id.x, id.y

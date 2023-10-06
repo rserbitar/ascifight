@@ -32,7 +32,7 @@ def get_all_actions() -> ascifight.routers.states.AllActionsResponse:
 
 
 def get_game_rules() -> ascifight.routers.states.RulesResponse:
-    url = config["server"] + "states/get_game_rules"
+    url = config["server"] + "states/game_rules"
     response = httpx.get(url)
     return ascifight.routers.states.RulesResponse.model_validate(response.json())
 
