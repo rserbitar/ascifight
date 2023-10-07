@@ -1,9 +1,12 @@
 import os
 import toml
 import httpx
+import structlog
 
 from ascifight.board.actions import Directions
 import ascifight.routers.states
+
+logger = structlog.getLogger()
 
 global config
 absolute_path = os.path.dirname(__file__)
@@ -49,3 +52,4 @@ def issue_order(order: str, actor_id: int, direction: Directions):
         params={"direction": direction.value},
         auth=(config["team"], str(config["password"])),
     )
+    logger.info("Sent order", order=order, actor=actor_id, direction=direction)

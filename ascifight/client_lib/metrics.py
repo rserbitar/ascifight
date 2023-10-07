@@ -94,7 +94,6 @@ class Metric(ABC):
             result = self.paths[(origin, destination)]
         else:
             result = self._path(origin, destination)
-            print(origin, destination, result)
             self.paths[(origin, destination)] = result
         return result
 
@@ -216,13 +215,13 @@ class DijkstraMetric(Metric):
             self.grid, origin, destination
         )
         path = dijkstra.reconstruct_path(came_from, start=origin, goal=destination)
-        dijkstra.draw_grid(
-            self.grid,
-            path=dijkstra.reconstruct_path(came_from, start=origin, goal=destination),
-            number=cost_so_far,
-            start=origin,
-            goal=destination,
-        )
+        # dijkstra.draw_grid(
+        #     self.grid,
+        #     path=dijkstra.reconstruct_path(came_from, start=origin, goal=destination),
+        #     number=cost_so_far,
+        #     start=origin,
+        #     goal=destination,
+        # )
         if unblock_origin:
             self.topology.blockers.append(origin)
         if unblock_destination:
