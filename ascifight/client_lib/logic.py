@@ -23,5 +23,3 @@ def execute():
 
     flag_runner = asci_agents.NearestFlagRunner(objects, 0)
     flag_runner.execute()
-
-    logger.info("Done executing!")

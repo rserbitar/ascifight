@@ -11,7 +11,7 @@ from ascifight.board.actions import Directions
 import ascifight.client_lib.dijkstra as dijkstra
 
 
-class Topology:
+class PathTopology:
     def __init__(
         self,
         objects: Objects,
@@ -58,7 +58,7 @@ class Topology:
 
 
 class Metric(ABC):
-    def __init__(self, topology: Topology):
+    def __init__(self, topology: PathTopology):
         self.topology = topology
         self.distance_fields: dict[Coordinates, dict[Coordinates, float]] = {}
         self.paths: dict[tuple[Coordinates, Coordinates], list[Coordinates]] = {}
@@ -189,7 +189,7 @@ class BasicMetric(Metric):
 
 
 class DijkstraMetric(Metric):
-    def __init__(self, topology: Topology) -> None:
+    def __init__(self, topology: PathTopology) -> None:
         super().__init__(topology)
         self.grid: dijkstra.GridWithWeights = dijkstra.GridWithWeights(
             height=self.topology.map_size,
