@@ -18,11 +18,10 @@ def execute():
     rules = infra.get_game_rules()
     team = infra.config["team"]
     objects = object.Objects(state, rules, team)
-
     # put your execution code here
 
     # which metric to use for way finding
-    metric_used = metrics.DijkstraMetric(objects)
+    metric_used = metrics.DijkstraMetric(metrics.Topology(objects))
     # the actor to use
     actor = objects.own_actor(0)
 

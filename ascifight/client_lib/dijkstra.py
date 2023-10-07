@@ -7,6 +7,9 @@
 from __future__ import annotations
 import heapq
 
+import numpy
+import numpy.typing
+
 from ascifight.board.data import Coordinates
 
 # some of these types are deprecated: https://www.python.org/dev/peps/pep-0585/
@@ -17,16 +20,20 @@ class GridWithWeights:
         self,
         width: int,
         height: int,
-        blockers: list[Coordinates] = [],
-        weights: dict[Coordinates, float] = {},
+        blockers: list[Coordinates] | None = None,
+        weights: numpy.typing.NDArray[numpy.float16] | None = None,
     ):
         self.width = width
         self.height = height
-        self.walls = blockers
-        self.weights = weights
+        self.blockers = blockers if blockers else []
+        self.weights = (
+            weights
+            if weights is not None
+            else numpy.ones((height, width), dtype=numpy.float16)
+        )
 
     def passable(self, id: Coordinates) -> bool:
-        return id not in self.walls
+        return id not in self.blockers
 
     def in_bounds(self, coordinates) -> bool:
         x, y = coordinates
@@ -41,8 +48,8 @@ class GridWithWeights:
         results = filter(self.passable, neighbors)
         return results
 
-    def cost(self, from_node: Coordinates, to_node: Coordinates) -> float:
-        return self.weights.get(to_node, 1)
+    def cost(self, coordinates: Coordinates) -> float:
+        return self.weights[coordinates.y, coordinates.x]
 
 
 class PriorityQueue:
@@ -76,7 +83,7 @@ def dijkstra_search(
             break
 
         for next in graph.neighbors(current):
-            new_cost = cost_so_far[current] + graph.cost(current, next)
+            new_cost = cost_so_far[current] + graph.cost(next)
             if next not in cost_so_far or new_cost < cost_so_far[next]:
                 cost_so_far[next] = new_cost
                 priority = new_cost
@@ -84,10 +91,6 @@ def dijkstra_search(
                 came_from[next] = current
 
     return came_from, cost_so_far
-
-
-# thanks to @m1sp <Jaiden Mispy> for this simpler version of
-# reconstruct_path that doesn't have duplicate entries
 
 
 def reconstruct_path(
@@ -128,7 +131,7 @@ def a_star_search(graph: GridWithWeights, start: Coordinates, goal: Coordinates)
             break
 
         for next in graph.neighbors(current):
-            new_cost = cost_so_far[current] + graph.cost(current, next)
+            new_cost = cost_so_far[current] + graph.cost(next)
             if next not in cost_so_far or new_cost < cost_so_far[next]:
                 cost_so_far[next] = new_cost
                 priority = new_cost + heuristic(next, goal)
@@ -159,14 +162,14 @@ def draw_tile(graph: GridWithWeights, id: Coordinates, style):
         r = " A "
     if "goal" in style and id == style["goal"]:
         r = " Z "
-    if id in graph.walls:
+    if id in graph.blockers:
         r = "###"
     return r
 
 
 def draw_grid(graph: GridWithWeights, **style):
     print("___" * graph.width)
-    for y in range(graph.height):
+    for y in reversed(range(graph.height)):
         for x in range(graph.width):
             print("%s" % draw_tile(graph, Coordinates(x=x, y=y), style), end="")
         print()
