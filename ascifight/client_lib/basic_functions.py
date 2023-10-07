@@ -2,13 +2,13 @@ from typing import Sequence, TypeVar
 
 import ascifight.board.data as data
 from ascifight.routers.states import (
-    StateResponse,
     ActorDescription,
     FlagDescription,
     WallDescription,
 )
 from ascifight.board.actions import Directions
-import ascifight.client_lib.metrics as metrics
+import ascifight.client_lib.metrics as asci_metrics
+import ascifight.client_lib.object as asci_object
 
 
 """
@@ -46,8 +46,11 @@ Basic interactions.
 def get_nearest_coordinates(
     origin: data.Coordinates,
     destinations: list[data.Coordinates],
-    metric: metrics.Metric,
+    metric: asci_metrics.Metric,
 ) -> data.Coordinates:
+    """
+    Calculate the nearest coordinates from a set of coordinates to an origin coordinate.
+    """
     result = []
     for destination in destinations:
         dist = metric.distance(origin, destination)
@@ -62,8 +65,11 @@ T = TypeVar("T", ActorDescription, FlagDescription, WallDescription)
 def get_nearest_object(
     origin_object: ActorDescription | FlagDescription | WallDescription,
     destination_objects: Sequence[T],
-    metric: metrics.Metric,
+    metric: asci_metrics.Metric,
 ) -> T:
+    """
+    Calculate the nearest board object from a list of board objects to an origin object.
+    """
     result = []
     for destination_object in destination_objects:
         dist = metric.distance(
@@ -76,30 +82,25 @@ def get_nearest_object(
 
 def nearest_enemy(
     object: ActorDescription | FlagDescription | WallDescription,
-    team: str,
-    game_state: StateResponse,
-    metric: metrics.Metric,
+    objects: asci_object.Objects,
+    metric: asci_metrics.Metric,
 ) -> ActorDescription:
     """
     Find the nearest enemy from a given object.
     """
-    all_actors = game_state.actors
-    enemy_actors = [actor for actor in all_actors if team != actor.team]
     return get_nearest_object(
-        origin_object=object, destination_objects=enemy_actors, metric=metric
+        origin_object=object, destination_objects=objects.enemy_actors, metric=metric
     )
 
 
 def nearest_enemy_flag(
     object: ActorDescription | FlagDescription | WallDescription,
-    team: str,
-    game_state: StateResponse,
-    metric: metrics.Metric,
+    objects: asci_object.Objects,
+    metric: asci_metrics.Metric,
 ) -> FlagDescription:
     """
     Find the nearest enemy from a given object.
     """
-    enemy_actors = [flag for flag in game_state.flags if team != flag.team]
     return get_nearest_object(
-        origin_object=object, destination_objects=enemy_actors, metric=metric
+        origin_object=object, destination_objects=objects.enemy_flags, metric=metric
     )
