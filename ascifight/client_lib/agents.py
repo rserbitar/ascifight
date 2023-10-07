@@ -1,5 +1,9 @@
 from abc import ABC, abstractmethod
 import structlog
+from structlog.contextvars import (
+    bind_contextvars,
+    bound_contextvars,
+)
 
 import ascifight.client_lib.infra as asci_infra
 import ascifight.client_lib.metrics as asci_metrics
@@ -24,13 +28,16 @@ class Agent(ABC):
         )
         self._logger = structlog.get_logger()
 
-    @abstractmethod
     def execute(self) -> None:
+        with bound_contextvars(actor=self.me.ident):
+            self._execute()
+
+    def _execute(self) -> None:
         pass
 
 
 class NearestFlagRunner(Agent):
-    def execute(self) -> None:
+    def _execute(self) -> None:
         metric_used = asci_metrics.DijkstraMetric(asci_metrics.Topology(self.objects))
         target_flag = asci_basic.nearest_enemy_flag(self.me, self.objects, metric_used)
         home_base = self.objects.home_base
