@@ -32,7 +32,7 @@ pre_chain = [
 
 log_config_dict = {
     "version": 1,
-    "disable_existing_loggers": False,
+    "disable_existing_loggers": True,
     "formatters": {
         "plain": {
             "()": structlog.stdlib.ProcessorFormatter,
@@ -58,7 +58,7 @@ log_config_dict = {
     },
     "handlers": {
         "default": {
-            "level": "INFO",
+            "level": "DEBUG",
             "class": "logging.StreamHandler",
             "formatter": "colored",
         },

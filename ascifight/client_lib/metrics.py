@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import math
 from typing import Callable
 
+import structlog
 import numpy
 import numpy.typing as npt
 
@@ -15,7 +16,7 @@ import ascifight.client_lib.dijkstra as dijkstra
 def gaussian_factory(factor: float, sigma: float) -> Callable[[float], float]:
     def gaussian(distance: float) -> float:
         x = distance / sigma
-        return factor * math.exp(-x * x / 2.0) / math.sqrt(2.0 * math.pi) / sigma
+        return factor * math.exp(-x * x / 2.0)
 
     return gaussian
 
@@ -46,6 +47,7 @@ class PathTopology:
         self.blocking_bases = blocking_bases
         self.blockers = self._blockers(additional_blockers)
         self.weights = self._weights(additional_weights)
+        self._logger = structlog.get_logger()
 
     def _blockers(
         self, additional_blockers: list[Coordinates] | None
@@ -98,27 +100,21 @@ class PathTopology:
 class AvoidKillerTopology(PathTopology):
     def __init__(
         self,
-        objects: Objects,
-        additional_weights: npt.NDArray[numpy.float16] | None,
-        avoid_function: Callable[[float], float] = gaussian_factory(
-            factor=3, sigma=0.3
-        ),
         *args,
+        avoid_function: Callable[[float], float] = gaussian_factory(factor=3, sigma=2),
         **kwargs,
     ) -> None:
+        super().__init__(*args, **kwargs)
         killer_coordinates = [
             actor.coordinates
-            for actor in objects.enemy_actors
+            for actor in self.objects.enemy_actors
             if actor.properties.attack > 0
         ]
-
+        self._logger.debug("Avoiding killers.", coordinates=killer_coordinates)
         weights = self._create_weights(
             [(coordinates, avoid_function) for coordinates in killer_coordinates]
         )
-        additional_weights = (
-            additional_weights + weights if additional_weights else weights
-        )
-        super().__init__(additional_weights=additional_weights * args, **kwargs)
+        self.weights = self.weights + weights
 
 
 class Metric(ABC):

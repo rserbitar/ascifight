@@ -108,7 +108,7 @@ class Agent(ABC):
 class NearestFlagRunner(Agent):
     def _execute(self) -> None:
         avoid_killer_metric = asci_metrics.DijkstraMetric(
-            asci_metrics.PathTopology(self.objects)
+            asci_metrics.AvoidKillerTopology(self.objects)
         )
         target_flag = asci_basic.nearest_enemy_flag(
             self.me, self.objects, avoid_killer_metric
@@ -123,8 +123,6 @@ class NearestFlagRunner(Agent):
         # we dont have the flag
         else:
             self.get_flag(target_flag, avoid_killer_metric)
-
-        metric = asci_metrics.DijkstraMetric(asci_metrics.PathTopology(self.objects))
 
 
 class NearestEnemyKiller(Agent):
