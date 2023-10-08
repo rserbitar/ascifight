@@ -52,7 +52,7 @@ def get_nearest_coordinates(
     """
     result = []
     for destination in destinations:
-        dist = metric.distance(origin, destination)
+        dist = metric.path_distance(origin, destination)
         result.append((dist, destination))
     result.sort(key=lambda x: x[0])
     return result[0][1]
@@ -73,7 +73,7 @@ def get_nearest_object(
     """
     result = []
     for destination_object in destination_objects:
-        dist = metric.distance(
+        dist = metric.path_distance(
             origin_object.coordinates, destination_object.coordinates
         )
         result.append((dist, destination_object))

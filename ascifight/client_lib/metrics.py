@@ -28,6 +28,13 @@ def linear_factory(factor: float, negative_slope: float) -> Callable[[float], fl
     return linear
 
 
+def step_factory(border: float, inner: float, outer: float) -> Callable[[float], float]:
+    def step(distance: float) -> float:
+        return inner if distance <= border else outer
+
+    return step
+
+
 class WeightsGenerator:
     def __init__(self, objects: Objects):
         self.objects = objects
@@ -39,22 +46,28 @@ class WeightsGenerator:
             numpy.square(x - coordinates.x) + numpy.square(y - coordinates.y)
         )
 
-    def _create_weights(
+    def _weights_for_multiple_coordinates(
         self, items: list[tuple[Coordinates, Callable[[float], float]]]
     ) -> npt.NDArray[numpy.float16]:
         weights: npt.NDArray[numpy.float16] = numpy.zeros(
             (self.map_size, self.map_size), dtype=numpy.float16
         )
         for item in items:
-            weight: npt.NDArray[numpy.float16] = numpy.ndarray(
-                (self.map_size, self.map_size), dtype=numpy.float16
-            )
-            for y in range(self.map_size):
-                for x in range(self.map_size):
-                    distance = self._distance(x, y, item[0])
-                    weight[y][x] = item[1](distance)
+            weight = self._weights_for_coordinates(item[0], item[1])
             weights = weights + weight
         return weights
+
+    def _weights_for_coordinates(
+        self, coordinates: Coordinates, function: Callable[[float], float]
+    ) -> npt.NDArray[numpy.float16]:
+        weight: npt.NDArray[numpy.float16] = numpy.ndarray(
+            (self.map_size, self.map_size), dtype=numpy.float16
+        )
+        for y in range(self.map_size):
+            for x in range(self.map_size):
+                distance = self._distance(x, y, coordinates)
+                weight[y][x] = function(distance)
+        return weight
 
     def avoid_attackers(
         self,
@@ -66,9 +79,16 @@ class WeightsGenerator:
             if actor.properties.attack > 0
         ]
         self._logger.debug("Avoiding killers.", coordinates=killer_coordinates)
-        weights = self._create_weights(
+        weights = self._weights_for_multiple_coordinates(
             [(coordinates, avoid_function) for coordinates in killer_coordinates]
         )
+        return weights
+
+    def guard_base(self, radius=5) -> npt.NDArray[numpy.float16]:
+        home_base_coordinates = self.objects.home_base.coordinates
+        guard_function = step_factory(5, 0, math.inf)
+        self._logger.debug("Guarding base.")
+        weights = self._weights_for_coordinates(home_base_coordinates, guard_function)
         return weights
 
 
@@ -117,21 +137,29 @@ class Metric(ABC):
             if blockers
             else BlockersGenerator(self.objects).standard_blockers()
         )
-        ones = numpy.zeros((self.map_size, self.map_size), dtype=numpy.float16)
+        ones = numpy.ones((self.map_size, self.map_size), dtype=numpy.float16)
         self.weights = ones if weights is None else ones + weights
 
         self.distance_fields: dict[Coordinates, dict[Coordinates, float]] = {}
         self.paths: dict[tuple[Coordinates, Coordinates], list[Coordinates]] = {}
 
-    def distance(self, origin: Coordinates, destination: Coordinates) -> float:
+    def path_distance(self, origin: Coordinates, destination: Coordinates) -> float:
         """
         The distance between origin and destination in steps. If a path can not be
         found the distance is infinity.
         """
         distance = math.inf
-        if path := self.path(origin, destination):
-            distance = len(path)
+        path = self.path(origin, destination)
+        print(path)
+        if destination in path:
+            distance = len(path) - 1
         return distance
+
+    def air_distance(self, origin: Coordinates, destination: Coordinates) -> float:
+        """
+        The distance between origin and destination absolute.
+        """
+        return abs(origin.x - destination.x) + abs(origin.y - destination.y)
 
     def distance_field(self, origin: Coordinates) -> dict[Coordinates, float]:
         """
@@ -168,7 +196,8 @@ class Metric(ABC):
         IF a path can not be found, the next direction is None.
         """
         direction = None
-        if path := self.path(origin, destination):
+        path = self.path(origin, destination)
+        if path and len(path) > 1:
             next = path[1]
 
             if origin.x == next.x:
@@ -274,10 +303,12 @@ class DijkstraMetric(Metric):
         came_from, cost_so_far = dijkstra.dijkstra_search(
             self.grid, origin, destination
         )
-        path = dijkstra.reconstruct_path(came_from, start=origin, goal=destination)
+        path = dijkstra.reconstruct_path(
+            came_from, cost_so_far, start=origin, goal=destination
+        )
         # dijkstra.draw_grid(
         #     self.grid,
-        #     path=dijkstra.reconstruct_path(came_from, start=origin, goal=destination),
+        #     path=path,
         #     number=cost_so_far,
         #     start=origin,
         #     goal=destination,
@@ -286,4 +317,4 @@ class DijkstraMetric(Metric):
             self.blockers.append(origin)
         if unblock_destination:
             self.blockers.append(destination)
-        return [i for i in path if i is not None]
+        return path

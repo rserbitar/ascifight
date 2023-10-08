@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 import heapq
+import math
 
 import numpy
 import numpy.typing
@@ -95,9 +96,10 @@ def dijkstra_search(
 
 def reconstruct_path(
     came_from: dict[Coordinates | None, Coordinates | None],
+    cost_so_far: dict[Coordinates, float],
     start: Coordinates,
     goal: Coordinates | None,
-) -> list[Coordinates | None]:
+) -> list[Coordinates]:
     current = goal
     path = []
     if goal not in came_from:  # no path was found
@@ -107,7 +109,12 @@ def reconstruct_path(
         current = came_from[current]
     path.append(start)  # optional
     path.reverse()  # optional
-    return path
+    final_path: list[Coordinates] = [
+        coordinates
+        for coordinates in path
+        if coordinates and cost_so_far[coordinates] != math.inf
+    ]
+    return final_path
 
 
 def heuristic(a: Coordinates, b: Coordinates) -> float:
@@ -144,7 +151,10 @@ def a_star_search(graph: GridWithWeights, start: Coordinates, goal: Coordinates)
 def draw_tile(graph: GridWithWeights, id: Coordinates, style):
     r = " . "
     if "number" in style and id in style["number"]:
-        r = " %-2d" % style["number"][id]
+        if style["number"][id] == math.inf:
+            r = "inf"
+        else:
+            r = " %-2d" % style["number"][id]
     if "point_to" in style and style["point_to"].get(id, None) is not None:
         (x1, y1) = id.x, id.y
         (x2, y2) = style["point_to"][id].x, style["point_to"][id].y
@@ -190,12 +200,12 @@ if __name__ == "__main__":
     start = Coordinates(x=2, y=2)
     goal: Coordinates | None = Coordinates(x=7, y=8)
     came_from, cost_so_far = dijkstra_search(diagram, start, goal)
-    path = reconstruct_path(came_from, start=start, goal=goal)
+    path = reconstruct_path(came_from, cost_so_far, start=start, goal=goal)
     print(path)
 
     draw_grid(
         diagram,
-        path=reconstruct_path(came_from, start=start, goal=goal),
+        path=reconstruct_path(came_from, cost_so_far, start=start, goal=goal),
         point_to=came_from,
         start=start,
         goal=goal,
@@ -204,7 +214,7 @@ if __name__ == "__main__":
     came_from, cost_so_far = dijkstra_search(diagram, start, goal)
     draw_grid(
         diagram,
-        path=reconstruct_path(came_from, start=start, goal=goal),
+        path=reconstruct_path(came_from, cost_so_far, start=start, goal=goal),
         number=cost_so_far,
         start=start,
         goal=goal,

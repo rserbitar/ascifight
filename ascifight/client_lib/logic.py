@@ -23,3 +23,7 @@ def execute():
 
     flag_runner = asci_agents.NearestFlagRunner(objects, 0)
     flag_runner.execute()
+    # attacker = asci_agents.NearestEnemyKiller(objects, 1)
+    # attacker.execute()
+    # guardian = asci_agents.Guardian(objects, 1)
+    # guardian.execute()

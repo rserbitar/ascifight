@@ -36,7 +36,9 @@ class Agent(ABC):
 
     def bring_flag_home(self, metric: asci_metrics.DijkstraMetric):
         home_base = self.objects.home_base
-        home_base_distance = metric.distance(self.me.coordinates, home_base.coordinates)
+        home_base_distance = metric.path_distance(
+            self.me.coordinates, home_base.coordinates
+        )
         home_base_direction = metric.next_direction(
             self.me.coordinates, home_base.coordinates
         )
@@ -44,7 +46,7 @@ class Agent(ABC):
         self._logger.info(f"Distance: to home_base {home_base_distance}")
         if home_base_direction is None:
             self._logger.info("No path!")
-        elif home_base_distance > 2:
+        elif home_base_distance > 1:
             self._logger.info("Heading home!")
             asci_infra.issue_order(
                 order="move", actor_id=self.me.ident, direction=home_base_direction
@@ -60,7 +62,9 @@ class Agent(ABC):
     def get_flag(
         self, target_flag: FlagDescription, metric: asci_metrics.DijkstraMetric
     ):
-        flag_distance = metric.distance(self.me.coordinates, target_flag.coordinates)
+        flag_distance = metric.path_distance(
+            self.me.coordinates, target_flag.coordinates
+        )
         flag_direction = metric.next_direction(
             self.me.coordinates, target_flag.coordinates
         )
@@ -68,7 +72,7 @@ class Agent(ABC):
         self._logger.info(f"Distance to flag: {flag_distance}")
         if flag_direction is None:
             self._logger.info("No path!")
-        elif flag_distance > 2:
+        elif flag_distance > 1:
             self._logger.info("Heading for flag!")
             asci_infra.issue_order(
                 order="move", actor_id=self.me.ident, direction=flag_direction
@@ -84,13 +88,13 @@ class Agent(ABC):
         target: asci_object.ExtendedActorDescription,
         metric: asci_metrics.DijkstraMetric,
     ):
-        enemy_distance = metric.distance(self.me.coordinates, target.coordinates)
+        enemy_distance = metric.path_distance(self.me.coordinates, target.coordinates)
         flag_direction = metric.next_direction(self.me.coordinates, target.coordinates)
 
         self._logger.info(f"Distance to enemy: {enemy_distance}")
         if flag_direction is None:
             self._logger.info("No path!")
-        elif enemy_distance > 2:
+        elif enemy_distance > 1:
             self._logger.info("Heading for target!")
             asci_infra.issue_order(
                 order="move", actor_id=self.me.ident, direction=flag_direction
@@ -129,5 +133,18 @@ class NearestEnemyKiller(Agent):
             blocking_enemy_actors=False
         )
         metric = asci_metrics.DijkstraMetric(self.objects, blockers=blockers)
+        target = asci_basic.nearest_enemy(self.me, self.objects, metric)
+        self.kill(target, metric)
+
+
+class Guardian(Agent):
+    def _execute(self) -> None:
+        blockers = asci_metrics.BlockersGenerator(self.objects).standard_blockers(
+            blocking_enemy_actors=False
+        )
+        guard_base_weights = asci_metrics.WeightsGenerator(self.objects).guard_base()
+        metric = asci_metrics.DijkstraMetric(
+            self.objects, blockers=blockers, weights=guard_base_weights
+        )
         target = asci_basic.nearest_enemy(self.me, self.objects, metric)
         self.kill(target, metric)
