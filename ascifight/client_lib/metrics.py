@@ -28,51 +28,11 @@ def linear_factory(factor: float, negative_slope: float) -> Callable[[float], fl
     return linear
 
 
-class PathTopology:
-    def __init__(
-        self,
-        objects: Objects,
-        blocking_walls: bool = True,
-        blocking_own_actors: bool = True,
-        blocking_enemy_actors: bool = True,
-        blocking_bases: bool = True,
-        additional_blockers: list[Coordinates] | None = None,
-        additional_weights: npt.NDArray[numpy.float16] | None = None,
-    ) -> None:
+class WeightsGenerator:
+    def __init__(self, objects: Objects):
         self.objects = objects
         self.map_size = objects.rules.map_size
-        self.blocking_walls = blocking_walls
-        self.blocking_enemy_actors = blocking_enemy_actors
-        self.blocking_own_actors = blocking_own_actors
-        self.blocking_bases = blocking_bases
-        self.blockers = self._blockers(additional_blockers)
-        self.weights = self._weights(additional_weights)
         self._logger = structlog.get_logger()
-
-    def _blockers(
-        self, additional_blockers: list[Coordinates] | None
-    ) -> list[Coordinates]:
-        blockers: list[Coordinates] = []
-        if self.blocking_walls:
-            blockers.extend([wall.coordinates for wall in self.objects.walls])
-        if self.blocking_bases:
-            blockers.extend([base.coordinates for base in self.objects.enemy_bases])
-            blockers.append(self.objects.home_base.coordinates)
-        if self.blocking_enemy_actors:
-            blockers.extend([actor.coordinates for actor in self.objects.enemy_actors])
-        if self.blocking_own_actors:
-            blockers.extend([actor.coordinates for actor in self.objects.own_actors])
-        if additional_blockers:
-            blockers.extend(additional_blockers)
-        return blockers
-
-    def _weights(
-        self, additional_weights: npt.NDArray[numpy.float16] | None
-    ) -> npt.NDArray[numpy.float16]:
-        weights = numpy.ones((self.map_size, self.map_size), dtype=numpy.float16)
-        if additional_weights:
-            weights = weights + additional_weights
-        return weights
 
     def _distance(self, x: int, y: int, coordinates: Coordinates) -> float:
         return numpy.sqrt(
@@ -96,15 +56,10 @@ class PathTopology:
             weights = weights + weight
         return weights
 
-
-class AvoidKillerTopology(PathTopology):
-    def __init__(
+    def avoid_attackers(
         self,
-        *args,
         avoid_function: Callable[[float], float] = gaussian_factory(factor=3, sigma=2),
-        **kwargs,
-    ) -> None:
-        super().__init__(*args, **kwargs)
+    ) -> npt.NDArray[numpy.float16]:
         killer_coordinates = [
             actor.coordinates
             for actor in self.objects.enemy_actors
@@ -114,12 +69,57 @@ class AvoidKillerTopology(PathTopology):
         weights = self._create_weights(
             [(coordinates, avoid_function) for coordinates in killer_coordinates]
         )
-        self.weights = self.weights + weights
+        return weights
+
+
+class BlockersGenerator:
+    def __init__(
+        self,
+        objects: Objects,
+        additional_blockers: list[Coordinates] | None = None,
+    ) -> None:
+        self.objects = objects
+        self.map_size = objects.rules.map_size
+        self._logger = structlog.get_logger()
+
+    def standard_blockers(
+        self,
+        blocking_walls: bool = True,
+        blocking_own_actors: bool = True,
+        blocking_enemy_actors: bool = True,
+        blocking_bases: bool = True,
+    ) -> list[Coordinates]:
+        blockers: list[Coordinates] = []
+        if blocking_walls:
+            blockers.extend([wall.coordinates for wall in self.objects.walls])
+        if blocking_bases:
+            blockers.extend([base.coordinates for base in self.objects.enemy_bases])
+            blockers.append(self.objects.home_base.coordinates)
+        if blocking_enemy_actors:
+            blockers.extend([actor.coordinates for actor in self.objects.enemy_actors])
+        if blocking_own_actors:
+            blockers.extend([actor.coordinates for actor in self.objects.own_actors])
+        return blockers
 
 
 class Metric(ABC):
-    def __init__(self, topology: PathTopology):
-        self.topology = topology
+    def __init__(
+        self,
+        objects: Objects,
+        blockers: list[Coordinates] | None = None,
+        weights: npt.NDArray[numpy.float16] | None = None,
+    ):
+        self.objects = objects
+        self.map_size = objects.rules.map_size
+
+        self.blockers = (
+            blockers
+            if blockers
+            else BlockersGenerator(self.objects).standard_blockers()
+        )
+        ones = numpy.zeros((self.map_size, self.map_size), dtype=numpy.float16)
+        self.weights = ones if weights is None else ones + weights
+
         self.distance_fields: dict[Coordinates, dict[Coordinates, float]] = {}
         self.paths: dict[tuple[Coordinates, Coordinates], list[Coordinates]] = {}
 
@@ -203,7 +203,7 @@ class Metric(ABC):
 
     def _in_bounds(self, coordinates: tuple[int, int]) -> bool:
         x, y = coordinates
-        map_size = self.topology.map_size
+        map_size = self.objects.rules.map_size
         return 0 <= x < map_size and 0 <= y < map_size
 
     def _neighbors(self, coordinates: Coordinates) -> list[Coordinates]:
@@ -217,8 +217,8 @@ class Metric(ABC):
 class BasicMetric(Metric):
     def _distance_field(self, origin: Coordinates) -> dict[Coordinates, float]:
         distance_field: dict[Coordinates, float] = {}
-        for i in range(self.topology.map_size):
-            for j in range(self.topology.map_size):
+        for i in range(self.map_size):
+            for j in range(self.map_size):
                 coordinates = Coordinates(x=i, y=j)
                 distance = self._distance(origin, coordinates)
                 distance_field[coordinates] = distance
@@ -249,13 +249,13 @@ class BasicMetric(Metric):
 
 
 class DijkstraMetric(Metric):
-    def __init__(self, topology: PathTopology) -> None:
-        super().__init__(topology)
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
         self.grid: dijkstra.GridWithWeights = dijkstra.GridWithWeights(
-            height=self.topology.map_size,
-            width=self.topology.map_size,
-            blockers=self.topology.blockers,
-            weights=self.topology.weights,
+            height=self.map_size,
+            width=self.map_size,
+            blockers=self.blockers,
+            weights=self.weights,
         )
 
     def _distance_field(self, origin: Coordinates) -> dict[Coordinates, float]:
@@ -264,12 +264,12 @@ class DijkstraMetric(Metric):
 
     def _path(self, origin: Coordinates, destination: Coordinates) -> list[Coordinates]:
         unblock_origin = False
-        if origin in self.topology.blockers:
-            self.topology.blockers.remove(origin)
+        if origin in self.blockers:
+            self.blockers.remove(origin)
             unblock_origin = True
         unblock_destination = False
-        if destination in self.topology.blockers:
-            self.topology.blockers.remove(destination)
+        if destination in self.blockers:
+            self.blockers.remove(destination)
             unblock_destination = True
         came_from, cost_so_far = dijkstra.dijkstra_search(
             self.grid, origin, destination
@@ -283,7 +283,7 @@ class DijkstraMetric(Metric):
         #     goal=destination,
         # )
         if unblock_origin:
-            self.topology.blockers.append(origin)
+            self.blockers.append(origin)
         if unblock_destination:
-            self.topology.blockers.append(destination)
+            self.blockers.append(destination)
         return [i for i in path if i is not None]

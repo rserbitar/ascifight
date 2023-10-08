@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 import structlog
 from structlog.contextvars import (
-    bind_contextvars,
     bound_contextvars,
 )
 
@@ -37,8 +36,6 @@ class Agent(ABC):
 
     def bring_flag_home(self, metric: asci_metrics.DijkstraMetric):
         home_base = self.objects.home_base
-
-        metric = asci_metrics.DijkstraMetric(asci_metrics.PathTopology(self.objects))
         home_base_distance = metric.distance(self.me.coordinates, home_base.coordinates)
         home_base_direction = metric.next_direction(
             self.me.coordinates, home_base.coordinates
@@ -107,8 +104,11 @@ class Agent(ABC):
 
 class NearestFlagRunner(Agent):
     def _execute(self) -> None:
+        avoid_attackers_weights = asci_metrics.WeightsGenerator(
+            self.objects
+        ).avoid_attackers()
         avoid_killer_metric = asci_metrics.DijkstraMetric(
-            asci_metrics.AvoidKillerTopology(self.objects)
+            self.objects, weights=avoid_attackers_weights
         )
         target_flag = asci_basic.nearest_enemy_flag(
             self.me, self.objects, avoid_killer_metric
@@ -116,9 +116,7 @@ class NearestFlagRunner(Agent):
 
         # if we already have the flag
         if self.me.flag == target_flag.team:
-            metric = asci_metrics.DijkstraMetric(
-                asci_metrics.PathTopology(self.objects)
-            )
+            metric = asci_metrics.DijkstraMetric(self.objects)
             self.bring_flag_home(metric)
         # we dont have the flag
         else:
@@ -127,7 +125,9 @@ class NearestFlagRunner(Agent):
 
 class NearestEnemyKiller(Agent):
     def _execute(self) -> None:
-        topology = asci_metrics.PathTopology(self.objects, blocking_enemy_actors=False)
-        metric = asci_metrics.DijkstraMetric(topology)
+        blockers = asci_metrics.BlockersGenerator(self.objects).standard_blockers(
+            blocking_enemy_actors=False
+        )
+        metric = asci_metrics.DijkstraMetric(self.objects, blockers=blockers)
         target = asci_basic.nearest_enemy(self.me, self.objects, metric)
         self.kill(target, metric)
