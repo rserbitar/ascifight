@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import math
+from typing import Callable
 
 import numpy
 import numpy.typing as npt
@@ -9,6 +10,21 @@ from ascifight.client_lib.object import Objects
 
 from ascifight.board.actions import Directions
 import ascifight.client_lib.dijkstra as dijkstra
+
+
+def gaussian_factory(factor: float, sigma: float) -> Callable[[float], float]:
+    def gaussian(distance: float) -> float:
+        x = distance / sigma
+        return factor * math.exp(-x * x / 2.0) / math.sqrt(2.0 * math.pi) / sigma
+
+    return gaussian
+
+
+def linear_factory(factor: float, negative_slope: float) -> Callable[[float], float]:
+    def linear(distance: float) -> float:
+        return min(0, factor - negative_slope * distance)
+
+    return linear
 
 
 class PathTopology:
@@ -56,6 +72,54 @@ class PathTopology:
             weights = weights + additional_weights
         return weights
 
+    def _distance(self, x: int, y: int, coordinates: Coordinates) -> float:
+        return numpy.sqrt(
+            numpy.square(x - coordinates.x) + numpy.square(y - coordinates.y)
+        )
+
+    def _create_weights(
+        self, items: list[tuple[Coordinates, Callable[[float], float]]]
+    ) -> npt.NDArray[numpy.float16]:
+        weights: npt.NDArray[numpy.float16] = numpy.zeros(
+            (self.map_size, self.map_size), dtype=numpy.float16
+        )
+        for item in items:
+            weight: npt.NDArray[numpy.float16] = numpy.ndarray(
+                (self.map_size, self.map_size), dtype=numpy.float16
+            )
+            for y in range(self.map_size):
+                for x in range(self.map_size):
+                    distance = self._distance(x, y, item[0])
+                    weight[y][x] = item[1](distance)
+            weights = weights + weight
+        return weights
+
+
+class AvoidKillerTopology(PathTopology):
+    def __init__(
+        self,
+        objects: Objects,
+        additional_weights: npt.NDArray[numpy.float16] | None,
+        avoid_function: Callable[[float], float] = gaussian_factory(
+            factor=3, sigma=0.3
+        ),
+        *args,
+        **kwargs,
+    ) -> None:
+        killer_coordinates = [
+            actor.coordinates
+            for actor in objects.enemy_actors
+            if actor.properties.attack > 0
+        ]
+
+        weights = self._create_weights(
+            [(coordinates, avoid_function) for coordinates in killer_coordinates]
+        )
+        additional_weights = (
+            additional_weights + weights if additional_weights else weights
+        )
+        super().__init__(additional_weights=additional_weights * args, **kwargs)
+
 
 class Metric(ABC):
     def __init__(self, topology: PathTopology):
@@ -66,7 +130,7 @@ class Metric(ABC):
     def distance(self, origin: Coordinates, destination: Coordinates) -> float:
         """
         The distance between origin and destination in steps. If a path can not be
-        found the distance is infinty.
+        found the distance is infinity.
         """
         distance = math.inf
         if path := self.path(origin, destination):

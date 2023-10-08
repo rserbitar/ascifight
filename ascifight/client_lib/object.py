@@ -12,6 +12,10 @@ from ascifight.routers.states import (
 )
 
 
+class ExtendedActorDescription(ActorDescription):
+    properties: data.ActorProperty
+
+
 class Objects:
     """
     Basic objects.
@@ -21,6 +25,10 @@ class Objects:
         self.game_state = game_state
         self.rules = rules
         self.own_team = own_team
+        self.extended_actors: list[ExtendedActorDescription] = [
+            self._add_properties(actor, self.rules.actor_properties)
+            for actor in self.game_state.actors
+        ]
         self.home_base = self._home_base()
         self.own_flag = self._own_flag()
         self.own_actors = self._own_actors()
@@ -30,33 +38,33 @@ class Objects:
         self.walls = self._walls()
         self.coordinates_objects = self._fill_coordinates()
 
-    def own_actor(self, actor_id: int) -> ActorDescription:
+    def own_actor(self, actor_id: int) -> ExtendedActorDescription:
         return next(
             actor
-            for actor in self.game_state.actors
+            for actor in self.extended_actors
             if actor.team == self.own_team and actor.ident == actor_id
         )
 
-    def enemy_actor_by_id(self, actor_id: int, team: str) -> ActorDescription:
+    def enemy_actor_by_id(self, actor_id: int, team: str) -> ExtendedActorDescription:
         return next(
             actor
-            for actor in self.game_state.actors
+            for actor in self.extended_actors
             if actor.team == team and actor.ident == actor_id
         )
 
-    def actor_by_coordinates(self, coordinates: data.Coordinates) -> ActorDescription:
+    def actor_by_coordinates(
+        self, coordinates: data.Coordinates
+    ) -> ExtendedActorDescription:
         return next(
-            actor
-            for actor in self.game_state.actors
-            if actor.coordinates == coordinates
+            actor for actor in self.extended_actors if actor.coordinates == coordinates
         )
 
     def enemy_actors_by_type(
         self, _type: str, team: str | None = None
-    ) -> list[ActorDescription]:
+    ) -> list[ExtendedActorDescription]:
         return [
             actor
-            for actor in self.game_state.actors
+            for actor in self.extended_actors
             if (actor.team == team or team is None) and actor.type == _type
         ]
 
@@ -71,9 +79,27 @@ class Objects:
     def enemy_base(self, team: str) -> BaseDescription:
         return next(base for base in self.game_state.bases if base.team == team)
 
+    def _add_properties(
+        self, actor: ActorDescription, properties: list[data.ActorProperty]
+    ) -> ExtendedActorDescription:
+        _type = actor.type
+        actor_properties = next(
+            actor_property
+            for actor_property in properties
+            if actor.type == actor_property.type
+        )
+        return ExtendedActorDescription(
+            type=actor.type,
+            team=actor.team,
+            ident=actor.ident,
+            flag=actor.flag,
+            coordinates=actor.coordinates,
+            properties=actor_properties,
+        )
+
     def _fill_coordinates(self) -> defaultdict[data.Coordinates, Any]:
         coordinates: defaultdict[data.Coordinates, Any] = defaultdict(list)
-        for actor in self.game_state.actors:
+        for actor in self.extended_actors:
             coordinates[actor.coordinates].append(actor)
         for flag in self.game_state.flags:
             coordinates[flag.coordinates].append(flag)
@@ -93,15 +119,11 @@ class Objects:
             flag for flag in self.game_state.flags if flag.team == self.own_team
         )
 
-    def _own_actors(self) -> list[ActorDescription]:
-        return [
-            actor for actor in self.game_state.actors if actor.team == self.own_team
-        ]
+    def _own_actors(self) -> list[ExtendedActorDescription]:
+        return [actor for actor in self.extended_actors if actor.team == self.own_team]
 
-    def _enemy_actors(self) -> list[ActorDescription]:
-        return [
-            actor for actor in self.game_state.actors if actor.team != self.own_team
-        ]
+    def _enemy_actors(self) -> list[ExtendedActorDescription]:
+        return [actor for actor in self.extended_actors if actor.team != self.own_team]
 
     def _enemy_flags(self) -> list[FlagDescription]:
         return [flag for flag in self.game_state.flags if flag.team != self.own_team]

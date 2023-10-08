@@ -2,7 +2,6 @@ from typing import Sequence, TypeVar
 
 import ascifight.board.data as data
 from ascifight.routers.states import (
-    ActorDescription,
     FlagDescription,
     WallDescription,
 )
@@ -59,11 +58,13 @@ def get_nearest_coordinates(
     return result[0][1]
 
 
-T = TypeVar("T", ActorDescription, FlagDescription, WallDescription)
+T = TypeVar("T", asci_object.ExtendedActorDescription, FlagDescription, WallDescription)
 
 
 def get_nearest_object(
-    origin_object: ActorDescription | FlagDescription | WallDescription,
+    origin_object: asci_object.ExtendedActorDescription
+    | FlagDescription
+    | WallDescription,
     destination_objects: Sequence[T],
     metric: asci_metrics.Metric,
 ) -> T:
@@ -81,10 +82,10 @@ def get_nearest_object(
 
 
 def nearest_enemy(
-    object: ActorDescription | FlagDescription | WallDescription,
+    object: asci_object.ExtendedActorDescription | FlagDescription | WallDescription,
     objects: asci_object.Objects,
     metric: asci_metrics.Metric,
-) -> ActorDescription:
+) -> asci_object.ExtendedActorDescription:
     """
     Find the nearest enemy from a given object.
     """
@@ -94,7 +95,7 @@ def nearest_enemy(
 
 
 def nearest_enemy_flag(
-    object: ActorDescription | FlagDescription | WallDescription,
+    object: asci_object.ExtendedActorDescription | FlagDescription | WallDescription,
     objects: asci_object.Objects,
     metric: asci_metrics.Metric,
 ) -> FlagDescription:
