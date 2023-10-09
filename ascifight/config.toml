@@ -6,7 +6,7 @@ log_dir = "logs"  # don't change during runtime
 scores_file = "scores.log"
 
 [game]
-map_size = 18
+map_size = 16
 max_score = 25
 max_ticks = 200
 capture_score = 5
@@ -14,8 +14,8 @@ kill_score = 1
 winning_bonus = 10
 home_flag_required = false
 map_style = 'arabia'  # Styles: arabia, blood_bath, black_forest, random. (random is random style, not random map)
-walls = 0.20  # Target integer number of walls (+- symmetries), or floating percentage of walls
-actors = ["Runner", "Generalist", "Runner"]
+walls = 0.15  # Target integer number of walls (+- symmetries), or floating percentage of walls
+actors = ["Runner", "Runner", "Attacker", "Attacker"]
 
 [[teams]]
 name = "Team 1"
@@ -24,14 +24,6 @@ password = "1"
 [[teams]]
 name = "Team 2"
 password = "2"
-
-[[teams]]
-name = "Team 3"
-password = "3"
-
-[[teams]]
-name = "Team 4"
-password = "4"
 
 [image]
 size = 980

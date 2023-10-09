@@ -41,10 +41,8 @@ class WeightsGenerator:
         self.map_size = objects.rules.map_size
         self._logger = structlog.get_logger()
 
-    def _distance(self, x: int, y: int, coordinates: Coordinates) -> float:
-        return numpy.sqrt(
-            numpy.square(x - coordinates.x) + numpy.square(y - coordinates.y)
-        )
+    def _distance(self, x1: float, y1: float, x2: float, y2: float) -> float:
+        return numpy.sqrt(numpy.square(x1 - x2) + numpy.square(y1 - y2))
 
     def _weights_for_multiple_coordinates(
         self, items: list[tuple[Coordinates, Callable[[float], float]]]
@@ -53,20 +51,20 @@ class WeightsGenerator:
             (self.map_size, self.map_size), dtype=numpy.float16
         )
         for item in items:
-            weight = self._weights_for_coordinates(item[0], item[1])
+            weight = self._weights_for_coordinates(item[0].x, item[0].y, item[1])
             weights = weights + weight
         return weights
 
     def _weights_for_coordinates(
-        self, coordinates: Coordinates, function: Callable[[float], float]
+        self, x: float, y: float, function: Callable[[float], float]
     ) -> npt.NDArray[numpy.float16]:
         weight: npt.NDArray[numpy.float16] = numpy.ndarray(
             (self.map_size, self.map_size), dtype=numpy.float16
         )
-        for y in range(self.map_size):
-            for x in range(self.map_size):
-                distance = self._distance(x, y, coordinates)
-                weight[y][x] = function(distance)
+        for y_map in range(self.map_size):
+            for x_map in range(self.map_size):
+                distance = self._distance(x, y, x_map, y_map)
+                weight[y_map][x_map] = function(distance)
         return weight
 
     def avoid_attackers(
@@ -86,10 +84,17 @@ class WeightsGenerator:
 
     def guard_base(self, radius=5) -> npt.NDArray[numpy.float16]:
         home_base_coordinates = self.objects.home_base.coordinates
-        guard_function = step_factory(5, 0, math.inf)
+        guard_function = step_factory(4, 0, math.inf)
         self._logger.debug("Guarding base.")
-        weights = self._weights_for_coordinates(home_base_coordinates, guard_function)
+        weights = self._weights_for_coordinates(
+            home_base_coordinates.x, home_base_coordinates.y, guard_function
+        )
         return weights
+
+    def avoid_coordinates(
+        self, x: float, y: float, avoid_function: Callable[[float], float]
+    ) -> npt.NDArray[numpy.float16]:
+        return self._weights_for_coordinates(x, y, avoid_function)
 
 
 class BlockersGenerator:
@@ -150,7 +155,6 @@ class Metric(ABC):
         """
         distance = math.inf
         path = self.path(origin, destination)
-        print(path)
         if destination in path:
             distance = len(path) - 1
         return distance
