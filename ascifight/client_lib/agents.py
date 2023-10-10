@@ -223,7 +223,7 @@ class NearestEnemyKiller(Agent):
         self.attack(target, metric)
 
 
-class Guardian(Agent):
+class Defender(Agent):
     """
     This agent :
     * runs to the nearest enemy
@@ -237,13 +237,13 @@ class Guardian(Agent):
             blocking_enemy_actors=False
         )
         # create weights for a virtual fence around the base
-        guard_base_weights = asci_metrics.WeightsGenerator(self.objects).guard_base()
+        defend_base_weights = asci_metrics.WeightsGenerator(self.objects).guard_base()
 
         # this metric will use weights to stop moving beyond a given distance
         move_metric = asci_metrics.DijkstraMetric(
-            self.objects, blockers=blockers, weights=guard_base_weights
+            self.objects, blockers=blockers, weights=defend_base_weights
         )
-        # ths metric will be sued for targeting to target and hit enemies
+        # ths metric will be used for targeting to target and hit enemies
         # beyond/at the virtual move wall
 
         target_metric = asci_metrics.DijkstraMetric(self.objects, blockers=blockers)

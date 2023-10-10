@@ -29,7 +29,7 @@ def execute():
     flag_sneaker.execute()
     attacker = asci_agents.NearestEnemyKiller(objects, 2)
     attacker.execute()
-    guardian = asci_agents.Guardian(objects, 3)
+    guardian = asci_agents.Defender(objects, 3)
     guardian.execute()
 
     # code for testing here!
@@ -51,5 +51,5 @@ def execute():
     flag_sneaker.execute()
     attacker = asci_agents.NearestEnemyKiller(objects, 2)
     attacker.execute()
-    guardian = asci_agents.Guardian(objects, 3)
+    guardian = asci_agents.Defender(objects, 3)
     guardian.execute()
