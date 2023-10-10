@@ -24,6 +24,9 @@ class ActorDescription(BaseModel):
         description="The current coordinates fo the actor."
     )
 
+    def __eq__(self, other) -> bool:
+        return self.ident == other.ident and self.team == other.team
+
 
 class FlagDescription(BaseModel):
     """A flag that can be grabbed and put."""
@@ -32,6 +35,9 @@ class FlagDescription(BaseModel):
     coordinates: data.Coordinates = Field(
         description="The current coordinates fo the flag."
     )
+
+    def __eq__(self, other) -> bool:
+        return self.team == other.team
 
 
 class ActionDescription(BaseModel):
