@@ -12,13 +12,13 @@ import ascifight.client_lib.object as asci_object
 
 from ascifight.routers.states import (
     FlagDescription,
-    WallDescription,
 )
 
 
 class Agent(ABC):
     def __init__(self, objects: asci_object.Objects, id: int) -> None:
         self.objects = objects
+        self.conditions = self.objects.conditions
         self.me = objects.own_actor(id)
         self.properties = next(
             prop
@@ -35,7 +35,7 @@ class Agent(ABC):
     def _execute(self) -> None:
         pass
 
-    def bring_flag_home(self, metric: asci_metrics.DijkstraMetric):
+    def bring_flag_home(self, metric: asci_metrics.Metric):
         """
         Tries to get back to the home base, using the given metric and place the flag
         on the home base.
@@ -64,9 +64,7 @@ class Agent(ABC):
                 direction=home_base_direction,
             )
 
-    def get_flag(
-        self, target_flag: FlagDescription, metric: asci_metrics.DijkstraMetric
-    ):
+    def get_flag(self, target_flag: FlagDescription, metric: asci_metrics.Metric):
         """
         Tries to ge to the targeted flags using the supplied metric
         and grab it once within reach.
@@ -90,8 +88,8 @@ class Agent(ABC):
     def attack(
         self,
         target: asci_object.ExtendedActorDescription,
-        move_metric: asci_metrics.DijkstraMetric,
-        target_metric: asci_metrics.DijkstraMetric | None = None,
+        move_metric: asci_metrics.Metric,
+        target_metric: asci_metrics.Metric | None = None,
     ):
         """Tries to move to the target using the supplied moving metric and
         then attack is using the supplied target metric."""
@@ -119,8 +117,24 @@ class Agent(ABC):
                     direction=enemy_target_direction,
                 )
 
+    def target_and_get_flag(self, metric: asci_metrics.Metric):
+        # we dont have a flag
+        if self.me.flag is None:
+            target_flag = asci_basic.nearest_enemy_flag(self.me, self.objects, metric)
+
+            if self.conditions.we_have_the_flag(target_flag):
+                target_destination = self.objects.enemy_base(
+                    target_flag.team
+                ).coordinates
+                self.move_to_destination(target_destination, metric)
+            else:
+                self.get_flag(target_flag, metric)
+        # if we already have a flag
+        else:
+            self.bring_flag_home(metric)
+
     def move_to_destination(
-        self, destination: asci_data.Coordinates, metric: asci_metrics.DijkstraMetric
+        self, destination: asci_data.Coordinates, metric: asci_metrics.Metric
     ):
         """
         Move to destination coordinates using the supplied metric.
@@ -158,17 +172,8 @@ class NearestFlagRunner(Agent):
         avoid_killer_metric = asci_metrics.DijkstraMetric(
             self.objects, weights=avoid_attackers_weights
         )
-        target_flag = asci_basic.nearest_enemy_flag(
-            self.me, self.objects, avoid_killer_metric
-        )
 
-        # if we already have the flag
-        if self.me.flag == target_flag.team:
-            metric = asci_metrics.DijkstraMetric(self.objects)
-            self.bring_flag_home(metric)
-        # we dont have the flag
-        else:
-            self.get_flag(target_flag, avoid_killer_metric)
+        self.target_and_get_flag(avoid_killer_metric)
 
 
 class AvoidCenterFlagRunner(Agent):
@@ -198,16 +203,7 @@ class AvoidCenterFlagRunner(Agent):
             self.objects, weights=avoid_attackers_weights + avoid_center_weights
         )
 
-        target_flag = asci_basic.nearest_enemy_flag(
-            self.me, self.objects, avoid_center_and_killer_metric
-        )
-
-        # if we already have the flag
-        if self.me.flag == target_flag.team:
-            self.bring_flag_home(avoid_center_and_killer_metric)
-        # we dont have the flag
-        else:
-            self.get_flag(target_flag, avoid_center_and_killer_metric)
+        self.target_and_get_flag(avoid_center_and_killer_metric)
 
 
 class NearestEnemyKiller(Agent):

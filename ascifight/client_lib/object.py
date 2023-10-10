@@ -29,14 +29,7 @@ class Objects:
             self._add_properties(actor, self.rules.actor_properties)
             for actor in self.game_state.actors
         ]
-        self.home_base = self._home_base()
-        self.own_flag = self._own_flag()
-        self.own_actors = self._own_actors()
-        self.enemy_actors = self._enemy_actors()
-        self.enemy_flags = self._enemy_flags()
-        self.enemy_bases = self._enemy_bases()
-        self.walls = self._walls()
-        self.coordinates_objects = self._fill_coordinates()
+        self.conditions = Conditions(self)
 
     def own_actor(self, actor_id: int) -> ExtendedActorDescription:
         return next(
@@ -97,7 +90,8 @@ class Objects:
             properties=actor_properties,
         )
 
-    def _fill_coordinates(self) -> defaultdict[data.Coordinates, Any]:
+    @property
+    def coordinates_objects(self) -> defaultdict[data.Coordinates, Any]:
         coordinates: defaultdict[data.Coordinates, Any] = defaultdict(list)
         for actor in self.extended_actors:
             coordinates[actor.coordinates].append(actor)
@@ -109,27 +103,49 @@ class Objects:
             coordinates[wall.coordinates].append(wall)
         return coordinates
 
-    def _home_base(self) -> BaseDescription:
+    @property
+    def home_base(self) -> BaseDescription:
         return next(
             base for base in self.game_state.bases if base.team == self.own_team
         )
 
-    def _own_flag(self) -> FlagDescription:
+    @property
+    def own_flag(self) -> FlagDescription:
         return next(
             flag for flag in self.game_state.flags if flag.team == self.own_team
         )
 
-    def _own_actors(self) -> list[ExtendedActorDescription]:
+    @property
+    def own_actors(self) -> list[ExtendedActorDescription]:
         return [actor for actor in self.extended_actors if actor.team == self.own_team]
 
-    def _enemy_actors(self) -> list[ExtendedActorDescription]:
+    @property
+    def enemy_actors(self) -> list[ExtendedActorDescription]:
         return [actor for actor in self.extended_actors if actor.team != self.own_team]
 
-    def _enemy_flags(self) -> list[FlagDescription]:
+    @property
+    def enemy_flags(self) -> list[FlagDescription]:
         return [flag for flag in self.game_state.flags if flag.team != self.own_team]
 
-    def _walls(self) -> list[WallDescription]:
+    @property
+    def walls(self) -> list[WallDescription]:
         return [wall for wall in self.game_state.walls]
 
-    def _enemy_bases(self) -> list[BaseDescription]:
+    @property
+    def enemy_bases(self) -> list[BaseDescription]:
         return [base for base in self.game_state.bases if base.team != self.own_team]
+
+
+class Conditions:
+    def __init__(self, objects: Objects):
+        self.objects = objects
+
+    def we_have_the_flag(self, flag: FlagDescription):
+        return any([actor.flag == flag for actor in self.objects.own_actors])
+
+    @property
+    def our_flag_is_at_home(self) -> bool:
+        return self.objects.own_flag.coordinates == self.objects.home_base.coordinates
+
+    def flag_is_at_home(self, flag: FlagDescription) -> bool:
+        return flag.coordinates == self.objects.enemy_base(flag.team)
