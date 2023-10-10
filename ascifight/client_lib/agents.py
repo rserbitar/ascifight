@@ -36,6 +36,10 @@ class Agent(ABC):
         pass
 
     def bring_flag_home(self, metric: asci_metrics.DijkstraMetric):
+        """
+        Tries to get back to the home base, using the given metric and place the flag
+        on the home base.
+        """
         home_base = self.objects.home_base
         home_base_distance = metric.path_distance(
             self.me.coordinates, home_base.coordinates
@@ -63,6 +67,10 @@ class Agent(ABC):
     def get_flag(
         self, target_flag: FlagDescription, metric: asci_metrics.DijkstraMetric
     ):
+        """
+        Tries to ge to the targeted flags using the supplied metric
+        and grab it once within reach.
+        """
         self.move_to_destination(destination=target_flag.coordinates, metric=metric)
 
         flag_distance = metric.path_distance(
@@ -85,6 +93,8 @@ class Agent(ABC):
         move_metric: asci_metrics.DijkstraMetric,
         target_metric: asci_metrics.DijkstraMetric | None = None,
     ):
+        """Tries to move to the target using the supplied moving metric and
+        then attack is using the supplied target metric."""
         if not target_metric:
             target_metric = move_metric
 
@@ -112,6 +122,9 @@ class Agent(ABC):
     def move_to_destination(
         self, destination: asci_data.Coordinates, metric: asci_metrics.DijkstraMetric
     ):
+        """
+        Move to destination coordinates using the supplied metric.
+        """
         destination_distance = metric.path_distance(self.me.coordinates, destination)
         destination_direction = metric.next_direction(self.me.coordinates, destination)
         self._logger.info(f"Distance to destination: {destination_distance}")
