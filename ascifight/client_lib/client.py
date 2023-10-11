@@ -3,13 +3,17 @@ import time
 
 import structlog
 
+import ascifight.client_lib.state as asci_state
 import ascifight.client_lib.logic as logic
 import ascifight.client_lib.infra as asci_infra
 
 logger = structlog.get_logger()
 
+state: asci_state.State | None = None
+
 
 def game_loop():
+    global state
     current_tick = -1
     while True:
         try:
@@ -19,7 +23,7 @@ def game_loop():
                 if timing.tick < current_tick:
                     # the game may have restarted, reset tick
                     current_tick = timing.tick
-                logic.execute()
+                state = logic.execute(state)
                 current_tick = timing.tick
                 logger.info(f"Issued orders for tick {current_tick}.")
             # sleep the time the server says it will take till next tick

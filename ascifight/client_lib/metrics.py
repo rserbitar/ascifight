@@ -7,7 +7,7 @@ import numpy
 import numpy.typing as npt
 
 from ascifight.board.data import Coordinates
-from ascifight.client_lib.object import Objects
+from ascifight.client_lib.state import State
 
 from ascifight.board.actions import Directions
 import ascifight.client_lib.dijkstra as dijkstra
@@ -36,9 +36,9 @@ def step_factory(border: float, inner: float, outer: float) -> Callable[[float],
 
 
 class WeightsGenerator:
-    def __init__(self, objects: Objects):
-        self.objects = objects
-        self.map_size = objects.rules.map_size
+    def __init__(self, state: State):
+        self.objects = state.objects
+        self.map_size = state.rules.map_size
         self._logger = structlog.get_logger()
 
     def _distance(self, x1: float, y1: float, x2: float, y2: float) -> float:
@@ -100,11 +100,11 @@ class WeightsGenerator:
 class BlockersGenerator:
     def __init__(
         self,
-        objects: Objects,
+        state: State,
         additional_blockers: list[Coordinates] | None = None,
     ) -> None:
-        self.objects = objects
-        self.map_size = objects.rules.map_size
+        self.objects = state.objects
+        self.map_size = state.rules.map_size
         self._logger = structlog.get_logger()
 
     def standard_blockers(
@@ -130,17 +130,16 @@ class BlockersGenerator:
 class Metric(ABC):
     def __init__(
         self,
-        objects: Objects,
+        state: State,
         blockers: list[Coordinates] | None = None,
         weights: npt.NDArray[numpy.float16] | None = None,
     ):
-        self.objects = objects
-        self.map_size = objects.rules.map_size
+        self.state = state
+        self.objects = state.objects
+        self.map_size = state.rules.map_size
 
         self.blockers = (
-            blockers
-            if blockers
-            else BlockersGenerator(self.objects).standard_blockers()
+            blockers if blockers else BlockersGenerator(self.state).standard_blockers()
         )
         ones = numpy.ones((self.map_size, self.map_size), dtype=numpy.float16)
         self.weights = ones if weights is None else ones + weights
@@ -236,7 +235,7 @@ class Metric(ABC):
 
     def _in_bounds(self, coordinates: tuple[int, int]) -> bool:
         x, y = coordinates
-        map_size = self.objects.rules.map_size
+        map_size = self.map_size
         return 0 <= x < map_size and 0 <= y < map_size
 
     def _neighbors(self, coordinates: Coordinates) -> list[Coordinates]:

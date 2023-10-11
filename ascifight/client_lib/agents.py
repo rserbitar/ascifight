@@ -8,7 +8,7 @@ import ascifight.board.data as asci_data
 import ascifight.client_lib.infra as asci_infra
 import ascifight.client_lib.metrics as asci_metrics
 import ascifight.client_lib.basic_functions as asci_basic
-import ascifight.client_lib.object as asci_object
+import ascifight.client_lib.state as asci_state
 
 from ascifight.routers.states import (
     FlagDescription,
@@ -16,14 +16,14 @@ from ascifight.routers.states import (
 
 
 class Agent(ABC):
-    def __init__(self, objects: asci_object.Objects, id: int) -> None:
-        self.objects = objects
-        self.conditions = self.objects.conditions
-        self.me = objects.own_actor(id)
+    def __init__(self, state: asci_state.State, id: int) -> None:
+        self.state = state
+        self.objects = state.objects
+        self.rules = state.rules
+        self.conditions = state.conditions
+        self.me = self.objects.own_actor(id)
         self.properties = next(
-            prop
-            for prop in self.objects.rules.actor_properties
-            if prop.type == self.me.type
+            prop for prop in self.rules.actor_properties if prop.type == self.me.type
         )
         self._logger = structlog.get_logger()
 
@@ -87,7 +87,7 @@ class Agent(ABC):
 
     def attack(
         self,
-        target: asci_object.ExtendedActorDescription,
+        target: asci_state.ExtendedActorDescription,
         move_metric: asci_metrics.Metric,
         target_metric: asci_metrics.Metric | None = None,
     ):
@@ -167,10 +167,10 @@ class NearestFlagRunner(Agent):
 
     def _execute(self) -> None:
         avoid_attackers_weights = asci_metrics.WeightsGenerator(
-            self.objects
+            self.state
         ).avoid_attackers()
         avoid_killer_metric = asci_metrics.DijkstraMetric(
-            self.objects, weights=avoid_attackers_weights
+            self.state, weights=avoid_attackers_weights
         )
 
         self.target_and_get_flag(avoid_killer_metric)
@@ -189,18 +189,16 @@ class AvoidCenterFlagRunner(Agent):
 
     def _execute(self) -> None:
         avoid_attackers_weights = asci_metrics.WeightsGenerator(
-            self.objects
+            self.state
         ).avoid_attackers()
-        center = self.objects.rules.map_size / 2 - 0.5
-        avoid_function = asci_metrics.gaussian_factory(
-            5, self.objects.rules.map_size / 3
-        )
+        center = self.rules.map_size / 2 - 0.5
+        avoid_function = asci_metrics.gaussian_factory(5, self.rules.map_size / 3)
         avoid_center_weights = asci_metrics.WeightsGenerator(
-            self.objects
+            self.state
         ).avoid_coordinates(center, center, avoid_function)
 
         avoid_center_and_killer_metric = asci_metrics.DijkstraMetric(
-            self.objects, weights=avoid_attackers_weights + avoid_center_weights
+            self.state, weights=avoid_attackers_weights + avoid_center_weights
         )
 
         self.target_and_get_flag(avoid_center_and_killer_metric)
@@ -215,10 +213,10 @@ class NearestEnemyKiller(Agent):
     """
 
     def _execute(self) -> None:
-        blockers = asci_metrics.BlockersGenerator(self.objects).standard_blockers(
+        blockers = asci_metrics.BlockersGenerator(self.state).standard_blockers(
             blocking_enemy_actors=False
         )
-        metric = asci_metrics.DijkstraMetric(self.objects, blockers=blockers)
+        metric = asci_metrics.DijkstraMetric(self.state, blockers=blockers)
         target = asci_basic.nearest_enemy(self.me, self.objects, metric)
         self.attack(target, metric)
 
@@ -233,19 +231,19 @@ class Defender(Agent):
     """
 
     def _execute(self) -> None:
-        blockers = asci_metrics.BlockersGenerator(self.objects).standard_blockers(
+        blockers = asci_metrics.BlockersGenerator(self.state).standard_blockers(
             blocking_enemy_actors=False
         )
         # create weights for a virtual fence around the base
-        defend_base_weights = asci_metrics.WeightsGenerator(self.objects).guard_base()
+        defend_base_weights = asci_metrics.WeightsGenerator(self.state).guard_base()
 
         # this metric will use weights to stop moving beyond a given distance
         move_metric = asci_metrics.DijkstraMetric(
-            self.objects, blockers=blockers, weights=defend_base_weights
+            self.state, blockers=blockers, weights=defend_base_weights
         )
         # ths metric will be used for targeting to target and hit enemies
         # beyond/at the virtual move wall
 
-        target_metric = asci_metrics.DijkstraMetric(self.objects, blockers=blockers)
+        target_metric = asci_metrics.DijkstraMetric(self.state, blockers=blockers)
         target = asci_basic.nearest_enemy(self.me, self.objects, target_metric)
         self.attack(target=target, move_metric=move_metric, target_metric=target_metric)

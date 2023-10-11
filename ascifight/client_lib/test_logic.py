@@ -4,7 +4,7 @@ from structlog.contextvars import (
 )
 import ascifight.client_lib.infra as asci_infra
 import ascifight.client_lib.agents as asci_agents
-import ascifight.client_lib.object as asci_object
+import ascifight.client_lib.state as asci_state
 
 
 logger = structlog.get_logger()
@@ -17,7 +17,7 @@ def execute():
     state = asci_infra.get_game_state()
     rules = asci_infra.get_game_rules()
     team = asci_infra.config["team"]
-    objects = asci_object.Objects(state, rules, team)
+    objects = asci_state.Objects(state, rules, team)
 
     bind_contextvars(tick=objects.game_state.tick)
 
@@ -39,7 +39,7 @@ def execute():
     state = asci_infra.get_game_state()
     rules = asci_infra.get_game_rules()
     team = asci_infra.config["team"]
-    objects = asci_object.Objects(state, rules, team)
+    objects = asci_state.Objects(state, rules, team)
 
     bind_contextvars(tick=objects.game_state.tick)
 

@@ -4,11 +4,13 @@ from typing import Any
 import ascifight.board.data as data
 from ascifight.routers.states import (
     BaseDescription,
+    CurrentActionsResponse,
     RulesResponse,
     StateResponse,
     ActorDescription,
     FlagDescription,
     WallDescription,
+    AllActionsResponse,
 )
 
 
@@ -23,10 +25,9 @@ class Objects:
 
     def __init__(self, game_state: StateResponse, rules: RulesResponse, own_team: str):
         self.game_state = game_state
-        self.rules = rules
         self.own_team = own_team
         self.extended_actors: list[ExtendedActorDescription] = [
-            self._add_properties(actor, self.rules.actor_properties)
+            self._add_properties(actor, rules.actor_properties)
             for actor in self.game_state.actors
         ]
         self.conditions = Conditions(self)
@@ -141,7 +142,9 @@ class Conditions:
         self.objects = objects
 
     def we_have_the_flag(self, flag: FlagDescription):
-        return any([actor.flag == flag for actor in self.objects.own_actors])
+        return any(
+            [actor.flag == flag for actor in self.objects.own_actors if actor.flag]
+        )
 
     @property
     def our_flag_is_at_home(self) -> bool:
@@ -149,3 +152,33 @@ class Conditions:
 
     def flag_is_at_home(self, flag: FlagDescription) -> bool:
         return flag.coordinates == self.objects.enemy_base(flag.team)
+
+
+class State:
+    def __init__(
+        self, own_team: str, rules: RulesResponse, actions: AllActionsResponse
+    ):
+        self.own_team = own_team
+        self.rules = rules
+        self.actions = actions.all_actions
+        self.objects_dict: dict[int, Objects] = {}
+        self.conditions_dict: dict[int, Conditions] = {}
+        self.tick = 0
+
+    @property
+    def objects(self) -> Objects:
+        return self.objects_dict[self.tick]
+
+    @property
+    def conditions(self) -> Conditions:
+        return self.conditions_dict[self.tick]
+
+    def new_tick(
+        self, game_state: StateResponse, current_actions: CurrentActionsResponse
+    ):
+        self.tick = game_state.tick
+        self.objects_dict[self.tick] = Objects(
+            own_team=self.own_team, game_state=game_state, rules=self.rules
+        )
+        self.actions[self.tick] = current_actions.current_actions
+        self.conditions_dict[self.tick] = Conditions(self.objects)

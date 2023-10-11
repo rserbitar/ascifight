@@ -7,7 +7,7 @@ from ascifight.routers.states import (
 )
 from ascifight.board.actions import Directions
 import ascifight.client_lib.metrics as asci_metrics
-import ascifight.client_lib.object as asci_object
+import ascifight.client_lib.state as asci_state
 
 
 """
@@ -58,11 +58,11 @@ def get_nearest_coordinates(
     return result[0][1]
 
 
-T = TypeVar("T", asci_object.ExtendedActorDescription, FlagDescription, WallDescription)
+T = TypeVar("T", asci_state.ExtendedActorDescription, FlagDescription, WallDescription)
 
 
 def get_nearest_object(
-    origin_object: asci_object.ExtendedActorDescription
+    origin_object: asci_state.ExtendedActorDescription
     | FlagDescription
     | WallDescription,
     destination_objects: Sequence[T],
@@ -82,10 +82,10 @@ def get_nearest_object(
 
 
 def nearest_enemy(
-    object: asci_object.ExtendedActorDescription | FlagDescription | WallDescription,
-    objects: asci_object.Objects,
+    object: asci_state.ExtendedActorDescription | FlagDescription | WallDescription,
+    objects: asci_state.Objects,
     metric: asci_metrics.Metric,
-) -> asci_object.ExtendedActorDescription:
+) -> asci_state.ExtendedActorDescription:
     """
     Find the nearest enemy from a given object.
     """
@@ -95,8 +95,8 @@ def nearest_enemy(
 
 
 def nearest_enemy_flag(
-    object: asci_object.ExtendedActorDescription | FlagDescription | WallDescription,
-    objects: asci_object.Objects,
+    object: asci_state.ExtendedActorDescription | FlagDescription | WallDescription,
+    objects: asci_state.Objects,
     metric: asci_metrics.Metric,
 ) -> FlagDescription:
     """
