@@ -94,7 +94,9 @@ class BoardObject(BaseModel, abc.ABC):
 
 
 class Flag(BoardObject):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     team: Team
+    board: BoardData
 
     def __eq__(self, another):
         return (
@@ -105,6 +107,10 @@ class Flag(BoardObject):
 
     def __hash__(self):
         return hash((self.__class__.__name__, self.team.name))
+
+    @property
+    def coordinates(self) -> Coordinates:
+        return self.board.flags_coordinates[self]
 
 
 class Actor(BoardObject, abc.ABC):
@@ -217,6 +223,19 @@ class BoardData:
         self.flags_coordinates: dict[Flag, Coordinates] = {}
         self.bases_coordinates: dict[Base, Coordinates] = {}
         self.walls_coordinates: set[Coordinates] = set()
+
+    def flag_is_at_home(self, team: Team) -> bool:
+        flag_coordinates = next(
+            coordinates
+            for flag, coordinates in self.flags_coordinates.items()
+            if flag.team == team
+        )
+        base_coordinates = next(
+            coordinates
+            for base, coordinates in self.bases_coordinates.items()
+            if base.team == team
+        )
+        return flag_coordinates == base_coordinates
 
     @property
     def actors_of_team(self) -> dict[str, list[Actor]]:

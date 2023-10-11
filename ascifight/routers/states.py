@@ -42,7 +42,9 @@ class FlagDescription(BaseModel):
 
 class ActionDescription(BaseModel):
     type: str = Field(description="The name of the action.")
-    actor: ActorDescription = Field(description="The actor performing the action.")
+    actor: ActorDescription | None = Field(
+        description="The actor performing the action."
+    )
     destination: data.Coordinates = Field(
         description="The coordinates to which the actions where performed."
     )
@@ -262,17 +264,21 @@ async def get_timing() -> TimingResponse:
     )
 
 
-def serialize_actor(actor) -> ActorDescription:
-    return ActorDescription(
-        type=actor.__class__.__name__,
-        team=actor.team.name,
-        ident=actor.ident,
-        flag=actor.flag.team.name if actor.flag else None,
-        coordinates=actor.coordinates,
+def serialize_actor(actor: data.Actor | None) -> ActorDescription | None:
+    return (
+        ActorDescription(
+            type=actor.__class__.__name__,
+            team=actor.team.name,
+            ident=actor.ident,
+            flag=actor.flag.team.name if actor.flag else None,
+            coordinates=actor.coordinates,
+        )
+        if actor
+        else None
     )
 
 
-def serialize_flag(flag) -> FlagDescription:
+def serialize_flag(flag: data.Flag) -> FlagDescription:
     return FlagDescription(
         team=flag.team.name,
         coordinates=flag.coordinates,

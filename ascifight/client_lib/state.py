@@ -143,7 +143,7 @@ class Conditions:
 
     def we_have_the_flag(self, flag: FlagDescription):
         return any(
-            [actor.flag == flag for actor in self.objects.own_actors if actor.flag]
+            [actor.flag == flag.team for actor in self.objects.own_actors if actor.flag]
         )
 
     @property

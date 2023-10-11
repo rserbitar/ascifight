@@ -102,7 +102,9 @@ class BoardSetup:
             )
             starting_pos = data.Coordinates(x=pos_x, y=pos_y)
             self.board_data.bases_coordinates[data.Base(team=team)] = starting_pos
-            self.board_data.flags_coordinates[data.Flag(team=team)] = starting_pos
+            self.board_data.flags_coordinates[
+                data.Flag(team=team, board=self.board_data)
+            ] = starting_pos
 
     def _get_area_positions(
         self, center: data.Coordinates, distance: int

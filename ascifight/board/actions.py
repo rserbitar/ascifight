@@ -301,10 +301,9 @@ class BoardActions:
             ):
                 scoring_team = base_at_flag_coordinates.team
                 # own flag is at base or this is not required
-                if (
-                    self.board_data.flags_coordinates[data.Flag(team=scoring_team)]
-                    == self.board_data.bases_coordinates[data.Base(team=scoring_team)]
-                ) or (not self.config["game"]["home_flag_required"]):
+                if not self.config["game"][
+                    "home_flag_required"
+                ] or self.board_data.flag_is_at_home(team=scoring_team):
                     self._logger.info(
                         f"{scoring_team} captured {flag_to_capture.team} flag!"
                     )
