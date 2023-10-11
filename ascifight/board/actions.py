@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from pydantic import ValidationError
-import toml
 import structlog
 import enum
 
@@ -8,6 +7,7 @@ import random
 
 
 import ascifight.board.data as data
+import ascifight.config as config
 
 
 class Directions(str, enum.Enum):
@@ -59,8 +59,8 @@ class BoardActions:
     def __init__(self, game_board_data: data.BoardData):
         self._logger = structlog.get_logger()
         self.board_data: data.BoardData = game_board_data
-        with open("config.toml", mode="r") as fp:
-            self.config = toml.load(fp)
+
+        self.config = config.config
 
     def move(
         self, actor: data.Actor, direction: Directions

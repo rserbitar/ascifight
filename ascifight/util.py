@@ -1,10 +1,5 @@
-import os
 import structlog
-import toml
-
-absolute_path = os.path.dirname(__file__)
-with open(f"{absolute_path}/config.toml", mode="r") as fp:
-    config = toml.load(fp)
+import ascifight.config as config
 
 
 time_stamper = structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S.%f", utc=False)
@@ -54,7 +49,7 @@ log_config_dict = {
         "file": {
             "level": "DEBUG",
             "class": "logging.handlers.RotatingFileHandler",
-            "filename": f"{config['server']['log_dir']}/game.log",
+            "filename": f"{config.config['server']['log_dir']}/game.log",
             "backupCount": 100,
             "formatter": "plain",
         },

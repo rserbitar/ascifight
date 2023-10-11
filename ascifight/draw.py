@@ -1,4 +1,5 @@
 import io
+import os
 
 import pydantic
 from PIL import Image, ImageDraw, ImageFont
@@ -12,6 +13,8 @@ import ascifight.util as util
 factor = int(config.config["image"]["size"] / config.config["game"]["map_size"])
 map_size: int = config.config["game"]["map_size"]
 
+FONTPATH = os.path.join(os.path.dirname(__file__), "DejaVuSansMono-Bold.ttf")
+
 
 class Icon(pydantic.BaseModel):
     name: str
@@ -22,7 +25,7 @@ class Icon(pydantic.BaseModel):
 def draw_objects(
     image_draw,
     icon: Icon,
-    fnt=ImageFont.truetype("DejaVuSansMono-Bold.ttf", int(factor / 2)),
+    fnt=ImageFont.truetype(FONTPATH, int(factor / 2)),
 ):
     image_draw.text(
         (
@@ -38,7 +41,7 @@ def draw_objects(
 def draw_icons(
     image_draw,
     icon: Icon,
-    fnt=ImageFont.truetype("DejaVuSansMono-Bold.ttf", int(factor)),
+    fnt=ImageFont.truetype(FONTPATH, int(factor)),
 ):
     image_draw.text(
         (
@@ -54,7 +57,7 @@ def draw_icons(
 def draw_annotations(
     image_draw,
     icon: Icon,
-    fnt=ImageFont.truetype("DejaVuSansMono-Bold.ttf", int(factor / 2)),
+    fnt=ImageFont.truetype(FONTPATH, int(factor / 2)),
 ):
     image_draw.text(
         (

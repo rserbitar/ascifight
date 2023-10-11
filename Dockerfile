@@ -1,33 +1,29 @@
-FROM ubuntu:22.04
+# The builder image, used to build the virtual environment
+FROM python:3.11-buster as builder
 
-USER root
-WORKDIR /home/user
+RUN pip install poetry==1.6.1
 
-# updating and setting up python
-RUN apt update
-RUN apt upgrade -y
-RUN apt install -y python3 python3-pip
-RUN pip3 install --upgrade pip
-RUN pip3 install --upgrade setuptools
+ENV POETRY_NO_INTERACTION=1 \
+    POETRY_VIRTUALENVS_IN_PROJECT=1 \
+    POETRY_VIRTUALENVS_CREATE=1 \
+    POETRY_CACHE_DIR=/tmp/poetry_cache
 
-# installing all the dependencies
-RUN pip3 install fastapi
-RUN pip3 install pydantic
-RUN pip3 install uvicorn
-RUN pip3 install structlog
-RUN pip3 install context-logging
-RUN pip3 install toml
-RUN pip3 install pillow
-RUN pip3 install httpx
-RUN pip3 install vpython
+WORKDIR /app
 
-# copying code
-COPY ascifight/ ascifight/
-COPY tests/ tests/
+COPY pyproject.toml poetry.lock ./
+RUN touch README.md
 
-# the server is available in port 8000
-EXPOSE 8000
+RUN poetry install --without dev --no-root && rm -rf $POETRY_CACHE_DIR
 
-# setting pythonpatj
-ENV PYTHONPATH "${PYTHONPATH}:/home/user"
+# The runtime image, used to just run the code provided its virtual environment
+FROM python:3.11-slim-buster as runtime
 
+ENV VIRTUAL_ENV=/app/.venv \
+    PATH="/app/.venv/bin:$PATH" \
+    PYTHONPATH="$PYTHONPATH:/ascifight"
+
+COPY --from=builder ${VIRTUAL_ENV} ${VIRTUAL_ENV}
+
+COPY ascifight ./ascifight
+
+ENTRYPOINT ["python", "-m", "main"]
