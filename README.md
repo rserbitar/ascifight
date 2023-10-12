@@ -60,3 +60,5 @@ The client is located in the client_lib directory. Important files are:
     - Conditions: higher level abstractions and statements about the game state
     - Actions: Actions that have been successfully performed by all teams during the game
 - client_config.toml: A config file for the client
+
+There is a testing client test_client.py that can be sued to test an team against itself. Note that it does not use the team names and passwords from the .toml file, but has hardcoded ones.

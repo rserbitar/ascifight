@@ -6,6 +6,7 @@ import logging.config
 
 from ascifight.board.actions import Directions
 import ascifight.routers.states
+import ascifight.client_lib.state
 
 global config
 absolute_path = os.path.dirname(__file__)
@@ -137,3 +138,18 @@ def issue_order(order: str, actor_id: int, direction: Directions):
         auth=(config["team"], str(config["password"])),
     )
     logger.info("Sent order", order=order, actor=actor_id, direction=direction)
+
+
+def update_state(
+    state: ascifight.client_lib.state.State | None,
+) -> ascifight.client_lib.state.State:
+    if not state:
+        rules = get_game_rules()
+        all_actions = get_all_actions()
+        state = ascifight.client_lib.state.State(
+            own_team=config["team"], rules=rules, actions=all_actions
+        )
+    game_state = get_game_state()
+    current_actions = get_current_actions()
+    state.new_tick(game_state=game_state, current_actions=current_actions)
+    return state

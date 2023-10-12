@@ -13,8 +13,6 @@ import numpy.typing
 
 from ascifight.board.data import Coordinates
 
-# some of these types are deprecated: https://www.python.org/dev/peps/pep-0585/
-
 
 class GridWithWeights:
     def __init__(

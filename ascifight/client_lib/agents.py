@@ -16,12 +16,12 @@ from ascifight.routers.states import (
 
 
 class Agent(ABC):
-    def __init__(self, state: asci_state.State, id: int) -> None:
+    def __init__(self, state: asci_state.State, ident: int) -> None:
         self.state = state
         self.objects = state.objects
         self.rules = state.rules
         self.conditions = state.conditions
-        self.me = self.objects.own_actor(id)
+        self.me = self.objects.own_actor(ident)
         self.properties = next(
             prop for prop in self.rules.actor_properties if prop.type == self.me.type
         )
@@ -37,7 +37,7 @@ class Agent(ABC):
 
     def bring_flag_home(self, metric: asci_metrics.Metric):
         """
-        Tries to get back to the home base, using the given metric and place the flag
+        Try to get back to the home base, using the given metric and place the flag
         on the home base.
         """
         home_base = self.objects.home_base
@@ -66,7 +66,7 @@ class Agent(ABC):
 
     def get_flag(self, target_flag: FlagDescription, metric: asci_metrics.Metric):
         """
-        Tries to ge to the targeted flags using the supplied metric
+        Try to ge to the targeted flags using the supplied metric
         and grab it once within reach.
         """
         self.move_to_destination(destination=target_flag.coordinates, metric=metric)
@@ -91,7 +91,7 @@ class Agent(ABC):
         move_metric: asci_metrics.Metric,
         target_metric: asci_metrics.Metric | None = None,
     ):
-        """Tries to move to the target using the supplied moving metric and
+        """Try to move to the target using the supplied moving metric and
         then attack is using the supplied target metric."""
         if not target_metric:
             target_metric = move_metric
@@ -156,7 +156,7 @@ class Agent(ABC):
 
 class NearestFlagRunner(Agent):
     """
-    This agent :
+    This agent:
     * runs to the nearest flag
         * avoids enemy attackers while doing so
     * grabs the target flag
@@ -178,7 +178,7 @@ class NearestFlagRunner(Agent):
 
 class AvoidCenterFlagRunner(Agent):
     """
-    This agent :
+    This agent:
     * runs to the nearest flag
         * avoids enemy attackers while doing so
     * grabs the target flag
@@ -206,7 +206,7 @@ class AvoidCenterFlagRunner(Agent):
 
 class NearestEnemyKiller(Agent):
     """
-    This agent :
+    This agent:
     * runs to the nearest enemy
     * tries to attack it
     * runs to the next nearest enemy
@@ -223,7 +223,7 @@ class NearestEnemyKiller(Agent):
 
 class Defender(Agent):
     """
-    This agent :
+    This agent:
     * runs to the nearest enemy
         * stays in an area around the flag while doing so
     * tries to attack it
