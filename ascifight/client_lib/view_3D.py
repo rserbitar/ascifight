@@ -2,7 +2,7 @@ import collections
 import time
 
 import httpx
-import vpython
+import vpython  # type: ignore
 
 import ascifight.client_lib.infra
 import ascifight.util
