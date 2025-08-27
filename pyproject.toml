@@ -1,31 +1,41 @@
-[tool.poetry]
+[project]
 name = "ascifight"
-version = "0.3.0"
-description = ""
-authors = ["serbitar <serbitar@sessionmob.de>"]
+version = "0.4.0"
+description = "Add your description here"
 readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+  "fastapi>=0.115.12",
+  "fastapi-mcp>=0.3.4",
+  "httpx>=0.28.1",
+  "pillow>=11.2.1",
+  "pydantic2>=1.1.15",
+  "structlog>=25.4.0",
+  "toml>=0.10.2",
+  "uvicorn>=0.34.3",
+  "vpython>=7.6.5",
+]
 
-[tool.poetry.dependencies]
-python = "^3.13"
-fastapi = "^0.115.12"
-pydantic2 = "^1.1.15"
-uvicorn = "^0.34.2"
-structlog = "^25.3.0"
-toml = "^0.10.2"
-pillow = "^11.2.1"
-httpx = "^0.28.1"
-vpython = "^7.6.5"
+[dependency-groups]
+dev = [
+  "black>=25.1.0",
+  "pytest>=8.4.0",
+  "types-pillow>=10.2.0.20240822",
+  "types-toml>=0.10.8.20240310",
+  "vulture>=2.14",
+]
 
+[project.scripts]
+test = "ascifight:main"
 
-[tool.poetry.group.dev.dependencies]
-mypy = "^1.16.0"
-black = "^25.1.0"
-types-toml = "^0.10.8.20240310"
-pytest = "^8.3.5"
-types-pillow = "^10.2.0.20240822"
-vulture = "^2.14"
+[tool.basedpyright]
+include = ["src"]
 
+reportAny = false
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.workspace]
+members = ["ascifight"]

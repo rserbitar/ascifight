@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 from fastapi import APIRouter, Response
 from starlette.responses import FileResponse
@@ -46,4 +47,5 @@ def get_game_map() -> Response:
 @router.get("/status_page", tags=["web-page"])
 async def read_index():
     "Show a web page displaying the latest game map."
-    return FileResponse("templates/index.html")
+    path = Path(__file__).parent / "../templates/index.html"
+    return FileResponse(path)

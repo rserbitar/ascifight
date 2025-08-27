@@ -1,5 +1,5 @@
+# The builder image, used to build the virtual environment
 ## An example of using standalone Python builds with multistage images.
-
 # First, build the application in the `/app` directory
 FROM ghcr.io/astral-sh/uv:trixie-slim AS builder
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
@@ -34,10 +34,8 @@ COPY --from=builder /app /app
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
 
-EXPOSE 8000
 
 # Run the FastAPI application by default
 # Uses `fastapi dev` to enable hot-reloading when the `watch` sync occurs
 # Uses `--host 0.0.0.0` to allow access from outside the container
-CMD ["python", "app/src/ascifight/main.py"] 
-
+CMD ["python", "app/src/ascifight/client_lib/client.py"] 
