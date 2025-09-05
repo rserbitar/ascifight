@@ -1,7 +1,7 @@
 import logging
 import logging.config
-import logging.handlers
 import asyncio
+from contextlib import asynccontextmanager
 import os
 
 import uvicorn
@@ -11,7 +11,6 @@ from fastapi.staticfiles import StaticFiles
 
 import structlog
 
-
 import ascifight.config as config
 import ascifight.routers.orders as orders
 import ascifight.routers.states as states
@@ -20,7 +19,6 @@ import ascifight.routers.router_utils as router_utils
 
 import ascifight.util as util
 import ascifight.game_loop as game_loop
-
 
 try:
     os.mkdir(config.config["server"]["log_dir"])
@@ -48,7 +46,16 @@ root_logger = logging.getLogger()
 logger = structlog.get_logger()
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):  # pyright: ignore [reportUnusedParameter]
+
+    logger.info("Starting server.")
+    asyncio.create_task(game_loop.routine())
+    yield
+
+
 app = FastAPI(
+    lifespan=lifespan,
     openapi_tags=router_utils.tags_metadata,
     title="A Social, Community Increasing - Fight",
     description=util.api_description,
@@ -66,13 +73,6 @@ app.include_router(other.router)
 app.mount(
     "/logs", StaticFiles(directory=config.config["server"]["log_dir"]), name="logs"
 )
-
-
-@app.on_event("startup")
-async def startup():
-    logger.info("Starting server.")
-    asyncio.create_task(game_loop.routine())
-
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="debug")
