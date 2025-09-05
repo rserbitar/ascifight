@@ -6,7 +6,7 @@ import itertools
 import typing
 from functools import total_ordering
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field
 import structlog
 
 import ascifight.config as config
@@ -18,12 +18,15 @@ class Team(BaseModel):
     password: str
     number: int
 
-    def __eq__(self, another):
+    @typing.override
+    def __eq__(self, another: typing.Any):
         return hasattr(another, "name") and self.name == another.name
 
+    @typing.override
     def __hash__(self):
         return hash(self.name)
 
+    @typing.override
     def __str__(self):
         return f"Team {self.name}"
 
@@ -31,22 +34,28 @@ class Team(BaseModel):
 @total_ordering
 class Coordinates(BaseModel):
     x: int = Field(
-        description="X coordinate is decreased by the 'left' and increased by the"
-        " 'right' direction.",
+        description=(
+            "X coordinate is decreased by the 'left' and increased by the"
+            " 'right' direction."
+        ),
         ge=0,
         le=config.config["game"]["map_size"] - 1,
     )
     y: int = Field(
-        description="Y coordinate is decreased by the 'down' and increased by the"
-        " 'up' direction.",
+        description=(
+            "Y coordinate is decreased by the 'down' and increased by the"
+            " 'up' direction."
+        ),
         ge=0,
         le=config.config["game"]["map_size"] - 1,
     )
 
+    @typing.override
     def __str__(self) -> str:
         return f"({self.x}/{self.y})"
 
-    def __eq__(self, another):
+    @typing.override
+    def __eq__(self, another: typing.Any):
         return (
             hasattr(another, "x")
             and self.x == another.x
@@ -54,14 +63,15 @@ class Coordinates(BaseModel):
             and self.y == another.y
         )
 
-    def __ne__(self, another):
+    @typing.override
+    def __ne__(self, another: typing.Any):
         return (
             hasattr(another, "x")
             and hasattr(another, "y")
             and (self.x != another.x or self.y != another.y)
         )
 
-    def __lt__(self, another):
+    def __lt__(self, another: typing.Any):
         return (
             hasattr(another, "x")
             and hasattr(another, "y")
@@ -69,6 +79,7 @@ class Coordinates(BaseModel):
             > another.x * another.x + another.y * another.y
         )
 
+    @typing.override
     def __hash__(self) -> int:
         return hash((self.x, self.y))
 
@@ -76,12 +87,15 @@ class Coordinates(BaseModel):
 class ActorProperty(BaseModel):
     type: str
     grab: float = Field(
-        description="The probability to successfully grab or put the flag. "
-        "An actor with 0 can not carry the flag. Not even when it is given to it.",
+        description=(
+            "The probability to successfully grab or put the flag. "
+            "An actor with 0 can not carry the flag. Not even when it is given to it."
+        ),
     )
     attack: float = Field(
-        description="The probability to successfully attack. An actor with 0 can "
-        "not attack.",
+        description=(
+            "The probability to successfully attack. An actor with 0 can " "not attack."
+        ),
     )
     build: float = Field(description="The probability to successfully build a wall.")
     destroy: float = Field(
@@ -89,22 +103,26 @@ class ActorProperty(BaseModel):
     )
 
 
-class BoardObject(BaseModel, abc.ABC):
+# Abstract class, using multiple inheritance with abc yields a pyright error
+class BoardObject(  # pyright: ignore [reportUnsafeMultipleInheritance]
+    BaseModel, abc.ABC
+):
     pass
 
 
 class Flag(BoardObject):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
     team: Team
     board: BoardData
 
-    def __eq__(self, another):
+    @typing.override
+    def __eq__(self, another: typing.Any):
         return (
             self.__class__.__name__ == another.__class__.__name__
             and hasattr(another, "team")
             and self.team.name == another.team.name
         )
 
+    @typing.override
     def __hash__(self):
         return hash((self.__class__.__name__, self.team.name))
 
@@ -114,7 +132,6 @@ class Flag(BoardObject):
 
 
 class Actor(BoardObject, abc.ABC):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
     ident: int
     team: Team
     board: BoardData
@@ -124,10 +141,12 @@ class Actor(BoardObject, abc.ABC):
     destroy: typing.ClassVar[float] = 0.0
     flag: Flag | None = None
 
+    @typing.override
     def __str__(self):
         return f"Actor ({self.__class__.__name__}) {self.team}-{self.ident}"
 
-    def __eq__(self, another):
+    @typing.override
+    def __eq__(self, another: typing.Any):
         return (
             self.__class__.__name__ == another.__class__.__name__
             and hasattr(another, "ident")
@@ -136,6 +155,7 @@ class Actor(BoardObject, abc.ABC):
             and self.team == another.team
         )
 
+    @typing.override
     def __hash__(self):
         return hash((self.__class__.__name__, self.ident, self.team))
 
@@ -182,13 +202,15 @@ class Destroyer(Actor):
 class Base(BoardObject):
     team: Team
 
-    def __eq__(self, another):
+    @typing.override
+    def __eq__(self, another: typing.Any):
         return (
             self.__class__.__name__ == another.__class__.__name__
             and hasattr(another, "team")
             and self.team.name == another.team.name
         )
 
+    @typing.override
     def __hash__(self):
         return hash((self.__class__.__name__, self.team.name))
 
@@ -197,32 +219,35 @@ class Wall(BoardObject):
     pass
 
 
-class BoardData:
-    def __init__(
-        self,
-        teams: list[dict[str, str]] = config.config["teams"],
-        actors: list[str] = config.config["game"]["actors"],
-        map_size: int = config.config["game"]["map_size"],
-        walls: int = config.config["game"]["walls"],
-    ) -> None:
+@typing.final
+class BoardData(BaseModel):  # pyright: ignore [reportUninitializedInstanceVariable]
+
+    teams_data: list[dict[str, str]] = config.config["teams"]
+    actors_data: list[str] = config.config["game"]["actors"]
+    map_size: int = config.config["game"]["map_size"]
+    walls: int = config.config["game"]["walls"]
+
+    _logger: typing.Any
+
+    names_teams: dict[str, Team] = {}
+    teams: list[Team] = []
+    actor_classes: list[type[Actor]] = []
+    teams_actors: dict[tuple[Team, int], Actor] = {}
+    actors_coordinates: dict[Actor, Coordinates] = {}
+    flags_coordinates: dict[Flag, Coordinates] = {}
+    bases_coordinates: dict[Base, Coordinates] = {}
+    walls_coordinates: set[Coordinates] = set()
+
+    def __init__(self, **kwargs: dict[str, typing.Any]) -> None:
+        super().__init__(**kwargs)
         self._logger = structlog.get_logger()
 
-        self.map_size: int = map_size
-        self.walls: int = walls
-
-        self.names_teams: dict[str, Team] = {
+        self.names_teams = {
             team["name"]: Team(name=team["name"], password=team["password"], number=i)
-            for i, team in enumerate(teams)
+            for i, team in enumerate(self.teams_data)
         }
-        self.teams: list[Team] = list(self.names_teams.values())
-        self.actor_classes: list[type[Actor]] = [
-            self._get_actor(actor) for actor in actors
-        ]
-        self.teams_actors: dict[tuple[Team, int], Actor] = {}
-        self.actors_coordinates: dict[Actor, Coordinates] = {}
-        self.flags_coordinates: dict[Flag, Coordinates] = {}
-        self.bases_coordinates: dict[Base, Coordinates] = {}
-        self.walls_coordinates: set[Coordinates] = set()
+        self.teams = list(self.names_teams.values())
+        self.actor_classes = [self._get_actor(actor) for actor in self.actors_data]
 
     def flag_is_at_home(self, team: Team) -> bool:
         flag_coordinates = next(
@@ -261,7 +286,7 @@ class BoardData:
         return {v: k for k, v in self.bases_coordinates.items()}
 
     def board_objects_coordinates(self, board_object: BoardObject) -> Coordinates:
-        match board_object:
+        match board_object:  # pyright: ignore [reportMatchNotExhaustive]
             case Flag():
                 coordinates = self.flags_coordinates[board_object]
             case Base():
@@ -269,7 +294,7 @@ class BoardData:
             case Actor():
                 coordinates = self.actors_coordinates[board_object]
         # ignore unbound variable, if it crashes it should be fixed
-        return coordinates  # type: ignore
+        return coordinates  # pyright: ignore [reportPossiblyUnboundVariable]
 
     def _get_actor(self, actor: str) -> type[Actor]:
         return getattr(sys.modules[__name__], actor)
