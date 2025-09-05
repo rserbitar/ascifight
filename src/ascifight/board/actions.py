@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from pydantic import ValidationError
 import structlog
 import enum
-
+import typing
 import random
 
 
@@ -55,6 +55,7 @@ class BuildAction(Action):
     pass
 
 
+@typing.final
 class BoardActions:
     def __init__(self, game_board_data: data.BoardData):
         self._logger = structlog.get_logger()
@@ -154,8 +155,10 @@ class BoardActions:
                     self._logger.info("Destruction did not work.")
                 else:
                     self._logger.info(
-                        f"{actor} successfully destroyed a wall at "
-                        f" {target_coordinates}."
+                        (
+                            f"{actor} successfully destroyed a wall at "
+                            f" {target_coordinates}."
+                        )
                     )
                     action = DestroyAction(actor=actor, destination=target_coordinates)
                     self.board_data.walls_coordinates.remove(target_coordinates)
@@ -178,14 +181,18 @@ class BoardActions:
             if target_actor is not None:
                 if not target_actor.grab:
                     self._logger.warning(
-                        f"{actor} can not hand the flag to actor {target_actor}. "
-                        " Can not have the flag."
+                        (
+                            f"{actor} can not hand the flag to actor {target_actor}. "
+                            " Can not have the flag."
+                        )
                     )
 
                 elif target_actor.flag is not None:
                     self._logger.warning(
-                        f"{actor} can not hand the flag to actor {target_actor}. "
-                        "Target already has a flag."
+                        (
+                            f"{actor} can not hand the flag to actor {target_actor}. "
+                            "Target already has a flag."
+                        )
                     )
 
                 else:
@@ -236,8 +243,10 @@ class BoardActions:
                     if target_actor is not None:
                         target_actor.flag = None
                         self._logger.info(
-                            f"{actor} grabbed the flag of {flag.team} from "
-                            "{target_actor}."
+                            (
+                                f"{actor} grabbed the flag of {flag.team} from "
+                                "{target_actor}."
+                            )
                         )
                         action = GrabAction(
                             actor=actor,
@@ -316,7 +325,7 @@ class BoardActions:
 
     def _respawn(self, actor: data.Actor) -> None:
         base_coordinates = self.board_data.bases_coordinates[data.Base(team=actor.team)]
-        possible_spawn_points = []
+        possible_spawn_points: list[data.Coordinates] = []
         for x in range(base_coordinates.x - 2, base_coordinates.x + 3):
             for y in range(base_coordinates.y - 2, base_coordinates.y + 3):
                 try:
