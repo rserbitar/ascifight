@@ -26,7 +26,7 @@ than others.
 #### 2. Run the server container
 
   ```[bash]
-  docker run -p 0.0.0.0:8000:8000 ascifight
+  podman run -p 0.0.0.0:8000:8000 ascifight
   ```
 
 #### 3. Check your browser
