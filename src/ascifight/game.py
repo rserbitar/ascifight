@@ -1,6 +1,6 @@
 from collections import defaultdict
 from pydantic import BaseModel, Field
-from typing import TypeVar
+import typing
 import structlog
 from structlog.contextvars import bind_contextvars, unbind_contextvars
 
@@ -12,12 +12,13 @@ import ascifight.board.setup as setup
 import ascifight.board.actions as asci_actions
 
 
-T = TypeVar("T")
+T = typing.TypeVar("T")
 
 
 class Order(BaseModel):
     team: str = Field(description="Name of the team to issue the order.")
 
+    @typing.override
     def __str__(self) -> str:
         return f"Order by {self.team}."
 
@@ -33,6 +34,7 @@ class AttackOrder(Order):
         description="The direction to attack from the position of the actor.",
     )
 
+    @typing.override
     def __str__(self) -> str:
         return f"AttackOrder by Actor {self.team}-{self.actor} -> {self.direction}"
 
@@ -51,6 +53,7 @@ class MoveOrder(Order):
         ),
     )
 
+    @typing.override
     def __str__(self) -> str:
         return f"MoveOrder by Actor {self.team}-{self.actor} -> {self.direction}"
 
@@ -69,6 +72,7 @@ class GrabPutOrder(Order):
         ),
     )
 
+    @typing.override
     def __str__(self) -> str:
         return f"GrabPutOrder by Actor {self.team}-{self.actor} -> {self.direction}"
 
@@ -84,6 +88,7 @@ class BuildOrder(Order):
         description="The direction to build from the position of the actor.",
     )
 
+    @typing.override
     def __str__(self) -> str:
         return f"BuildOrder by Actor {self.team}-{self.actor} -> {self.direction}"
 
@@ -99,15 +104,17 @@ class DestroyOrder(Order):
         description="The direction to destroy from the position of the actor.",
     )
 
+    @typing.override
     def __str__(self) -> str:
         return f"DestroyOrder by Actor {self.team}-{self.actor} -> {self.direction}"
 
 
+@typing.final
 class Game:
     def __init__(
         self,
-        game_board: data.BoardData = data.BoardData(),
-        score_file=config.config["server"]["scores_file"],
+        game_board: data.BoardData | None = None,
+        score_file: str = config.config["server"]["scores_file"],
         capture_score: int = config.config["game"]["capture_score"],
         kill_score: int = config.config["game"]["kill_score"],
         winning_bonus: int = config.config["game"]["winning_bonus"],
@@ -121,7 +128,7 @@ class Game:
         self.kill_score: int = kill_score
         self.winning_bonus: int = winning_bonus
 
-        self.board = game_board
+        self.board = game_board if game_board else data.BoardData()
         self.board_actions = asci_actions.BoardActions(self.board)
         self.scores: dict[data.Team, int] = {}
         self.overall_scores: dict[data.Team, int] = {}
@@ -240,7 +247,7 @@ class Game:
             pass
 
     def _actor_dict(self, value: T) -> dict[data.Actor, T]:
-        value_dict = {}
+        value_dict: dict[data.Actor, T] = {}
         for actor in self.board.teams_actors.values():
             value_dict[actor] = value
         return value_dict
