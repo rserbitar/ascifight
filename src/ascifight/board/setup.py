@@ -13,6 +13,7 @@ import ascifight.pixel_draw as pixel_draw
 MapStyle = typing.Literal["arabia", "blood_bath", "black_forest", "random"]
 
 
+@typing.final
 class BoardSetup:
     # Assumptions made in code below:
     #   1. Base angle is between -pi/2 and pi/2 (used when placing walls)
