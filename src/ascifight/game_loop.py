@@ -76,7 +76,7 @@ async def get_all_queue_items(
     items: list[game.Order] = []
     item = await queue.get()
     while item is not SENTINEL:
-        items.append(item)  # type: ignore
+        items.append(item)  # pyright: ignore [reportArgumentType]
         queue.task_done()
         item = await queue.get()
     queue.task_done()
