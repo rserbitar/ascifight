@@ -45,12 +45,12 @@ class BoardSetup:
         }
         self.teams: list[data.Team] = list(self.board_data.names_teams.values())
         self.actor_classes: list[type[data.Actor]] = [
-            self.board_data._get_actor(actor) for actor in actors
+            self.board_data.get_actor_class(actor) for actor in actors
         ]
 
-        if map_style == "random":
-            map_style = random.choice(tuple(self.wall_placer.keys()))  # type: ignore
         self.map_style = map_style
+        if map_style == "random":
+            self.map_style = random.choice(tuple(self.wall_placer.keys()))
 
     def initialize_map(self):
         self.board_data.map_size = self.map_size
@@ -148,7 +148,7 @@ class BoardSetup:
         else:
             num_walls = typing.cast(int, self.walls)
 
-        forbidden_positions = set()
+        forbidden_positions: set[data.Coordinates] = set()
         for base_coordinates in self.board_data.bases_coordinates.values():
             forbidden_positions.update(self._get_area_positions(base_coordinates, 2))
 
@@ -243,7 +243,7 @@ class BoardSetup:
         The walls parameter influences the width of the paths (higher number of walls
         -> narrower paths) but only slightly. The path width is always between 2 and 5.
         """
-        forbidden_positions = set()
+        forbidden_positions: set[data.Coordinates] = set()
         for base_coordinates in self.board_data.bases_coordinates.values():
             forbidden_positions.update(self._get_area_positions(base_coordinates, 2))
 

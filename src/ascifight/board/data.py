@@ -247,7 +247,7 @@ class BoardData(BaseModel):  # pyright: ignore [reportUninitializedInstanceVaria
             for i, team in enumerate(self.teams_data)
         }
         self.teams = list(self.names_teams.values())
-        self.actor_classes = [self._get_actor(actor) for actor in self.actors_data]
+        self.actor_classes = [self.get_actor_class(actor) for actor in self.actors_data]
 
     def flag_is_at_home(self, team: Team) -> bool:
         flag_coordinates = next(
@@ -296,7 +296,7 @@ class BoardData(BaseModel):  # pyright: ignore [reportUninitializedInstanceVaria
         # ignore unbound variable, if it crashes it should be fixed
         return coordinates  # pyright: ignore [reportPossiblyUnboundVariable]
 
-    def _get_actor(self, actor: str) -> type[Actor]:
+    def get_actor_class(self, actor: str) -> type[Actor]:
         return getattr(sys.modules[__name__], actor)
 
     def get_actor_properties(self) -> list[ActorProperty]:
