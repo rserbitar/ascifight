@@ -14,13 +14,16 @@ ENV UV_PYTHON_PREFERENCE=only-managed
 RUN uv python install 3.13
 
 WORKDIR /app
+
 RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=uv.lock,target=uv.lock \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --locked --no-install-project --no-dev
+  --mount=type=bind,source=uv.lock,target=uv.lock \
+  --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+  uv sync --locked --no-install-project --no-dev
+
 COPY . /app
+
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-dev
+  uv sync --locked --no-dev
 
 # Then, use a final image without uv
 FROM debian:trixie-slim
