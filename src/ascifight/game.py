@@ -139,8 +139,6 @@ class Game:
     def initiate_game(self) -> None:
         game_board_setup = setup.BoardSetup(
             game_board_data=self.board,
-            teams=config.config["teams"],
-            actors=config.config["game"]["actors"],
             map_size=config.config["game"]["map_size"],
             walls=config.config["game"]["walls"],
             map_style=config.config["game"]["map_style"],

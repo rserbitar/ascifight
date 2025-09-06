@@ -19,7 +19,7 @@ class Team(BaseModel):
     number: int
 
     @typing.override
-    def __eq__(self, another: typing.Any):
+    def __eq__(self, another: typing.Any) -> bool:
         return hasattr(another, "name") and self.name == another.name
 
     @typing.override
@@ -55,7 +55,7 @@ class Coordinates(BaseModel):
         return f"({self.x}/{self.y})"
 
     @typing.override
-    def __eq__(self, another: typing.Any):
+    def __eq__(self, another: typing.Any) -> bool:
         return (
             hasattr(another, "x")
             and self.x == another.x
@@ -64,14 +64,14 @@ class Coordinates(BaseModel):
         )
 
     @typing.override
-    def __ne__(self, another: typing.Any):
+    def __ne__(self, another: typing.Any) -> bool:
         return (
             hasattr(another, "x")
             and hasattr(another, "y")
             and (self.x != another.x or self.y != another.y)
         )
 
-    def __lt__(self, another: typing.Any):
+    def __lt__(self, another: typing.Any) -> bool:
         return (
             hasattr(another, "x")
             and hasattr(another, "y")
@@ -115,7 +115,7 @@ class Flag(BoardObject):
     board: BoardData
 
     @typing.override
-    def __eq__(self, another: typing.Any):
+    def __eq__(self, another: typing.Any) -> bool:
         return (
             self.__class__.__name__ == another.__class__.__name__
             and hasattr(another, "team")
@@ -146,7 +146,7 @@ class Actor(BoardObject, abc.ABC):
         return f"Actor ({self.__class__.__name__}) {self.team}-{self.ident}"
 
     @typing.override
-    def __eq__(self, another: typing.Any):
+    def __eq__(self, another: typing.Any) -> bool:
         return (
             self.__class__.__name__ == another.__class__.__name__
             and hasattr(another, "ident")
@@ -203,7 +203,7 @@ class Base(BoardObject):
     team: Team
 
     @typing.override
-    def __eq__(self, another: typing.Any):
+    def __eq__(self, another: typing.Any) -> bool:
         return (
             self.__class__.__name__ == another.__class__.__name__
             and hasattr(another, "team")

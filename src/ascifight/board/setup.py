@@ -24,8 +24,6 @@ class BoardSetup:
     def __init__(
         self,
         game_board_data: data.BoardData,
-        teams: list[dict[str, str]],
-        actors: list[str],
         map_size: int,
         walls: int | float,
         map_style: MapStyle,
@@ -35,41 +33,26 @@ class BoardSetup:
         self.map_size = map_size
         self.board_data = game_board_data
         self.walls = walls
-        self.num_players = len(teams)
-
-        self.names_teams: dict[str, data.Team] = {
-            team["name"]: data.Team(
-                name=team["name"], password=team["password"], number=i
-            )
-            for i, team in enumerate(teams)
-        }
-        self.teams: list[data.Team] = list(self.board_data.names_teams.values())
-        self.actor_classes: list[type[data.Actor]] = [
-            self.board_data.get_actor_class(actor) for actor in actors
-        ]
+        self.num_players = len(self.board_data.teams)
 
         self.map_style = map_style
         if map_style == "random":
             self.map_style = random.choice(tuple(self.wall_placer.keys()))
 
     def initialize_map(self):
-        self.board_data.map_size = self.map_size
-        self.board_data.names_teams = self.names_teams
-        self.board_data.teams = self.teams
-        self.board_data.actor_classes = self.actor_classes
         self._place_board_objects()
 
     def _place_board_objects(self) -> None:
         self._place_bases_and_flags()
-        for team in self.teams:
-            for number, actor_class in enumerate(self.actor_classes):
+        for team in self.board_data.teams:
+            for number, actor_class in enumerate(self.board_data.actor_classes):
                 self.board_data.teams_actors[(team, number)] = actor_class(
                     ident=number, team=team, board=self.board_data
                 )
             coordinates = self.board_data.bases_coordinates[data.Base(team=team)]
             actors = [
                 self.board_data.teams_actors[(team, a)]
-                for a in range(len(self.actor_classes))
+                for a in range(len(self.board_data.actor_classes))
             ]
             self._place_actors(actors, coordinates)
         self._place_walls()
@@ -94,7 +77,7 @@ class BoardSetup:
 
         random_distance = random.randint(minimum_distance, maximum_distance)
         angle_step = 2 * math.pi / self.num_players
-        for i, team in enumerate(self.teams):
+        for i, team in enumerate(self.board_data.teams):
             pos_x = int(
                 math.sin(self.base_angle + i * angle_step) * random_distance + half_size
             )
