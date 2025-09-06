@@ -1,4 +1,5 @@
 import datetime
+import typing
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
@@ -21,10 +22,11 @@ class ActorDescription(BaseModel):
         description="If and which teams flag the actor is carrying."
     )
     coordinates: data.Coordinates = Field(
-        description="The current coordinates fo the actor."
+        description="The current coordinates of the actor."
     )
 
-    def __eq__(self, other) -> bool:
+    @typing.override
+    def __eq__(self, other: typing.Any) -> bool:
         return self.ident == other.ident and self.team == other.team
 
 
@@ -36,7 +38,8 @@ class FlagDescription(BaseModel):
         description="The current coordinates fo the flag."
     )
 
-    def __eq__(self, other) -> bool:
+    @typing.override
+    def __eq__(self, other: typing.Any) -> bool:
         return self.team == other.team
 
 
@@ -129,8 +132,10 @@ class CurrentActionsResponse(BaseModel):
 
 class AllActionsResponse(BaseModel):
     all_actions: dict[int, list[ActionDescription]] = Field(
-        description="A dictionary with each past tick int he game as key and a list of"
-        "all successfully performed actions as value."
+        description=(
+            "A dictionary with each past tick int he game as key and a list of"
+            "all successfully performed actions as value."
+        )
     )
 
 
@@ -294,7 +299,7 @@ def serialize_actions(actions: list[asci_actions.Action]) -> list[ActionDescript
         origin = None
         flag = None
         target = None
-        match action:
+        match action:  # pyright: ignore [reportMatchNotExhaustive]
             case asci_actions.MoveAction():
                 origin = action.origin
             case asci_actions.BuildAction():
@@ -322,7 +327,7 @@ def serialize_actions(actions: list[asci_actions.Action]) -> list[ActionDescript
 
 
 def serialize_all_actions(
-    log: dict[int, list[asci_actions.Action]]
+    log: dict[int, list[asci_actions.Action]],
 ) -> dict[int, list[ActionDescription]]:
     result: dict[int, list[ActionDescription]] = {}
     for tick, actions in log.items():

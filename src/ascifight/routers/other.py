@@ -19,7 +19,9 @@ async def get_log_files() -> list[str]:
     attached.
 
     The log files itself can be fetched using the '/logs/[filename]' endpoint."""
-    return os.listdir(config.config["server"]["log_dir"])
+    return os.listdir(
+        config.config["server"]["log_dir"]
+    )  # pyright: ignore [reportUnknownVariableType]
 
 
 @router.get(
