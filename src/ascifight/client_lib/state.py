@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Any
+import typing
 
 import ascifight.board.data as data
 from ascifight.routers.states import (
@@ -11,6 +11,7 @@ from ascifight.routers.states import (
     FlagDescription,
     WallDescription,
     AllActionsResponse,
+    ActionDescription,
 )
 
 
@@ -24,13 +25,13 @@ class Objects:
     """
 
     def __init__(self, game_state: StateResponse, rules: RulesResponse, own_team: str):
-        self.game_state = game_state
-        self.own_team = own_team
+        self.game_state: StateResponse = game_state
+        self.own_team: str = own_team
         self.extended_actors: list[ExtendedActorDescription] = [
             self._add_properties(actor, rules.actor_properties)
             for actor in self.game_state.actors
         ]
-        self.conditions = Conditions(self)
+        self.conditions: Conditions = Conditions(self)
 
     def own_actor(self, actor_id: int) -> ExtendedActorDescription:
         return next(
@@ -92,8 +93,8 @@ class Objects:
         )
 
     @property
-    def coordinates_objects(self) -> defaultdict[data.Coordinates, Any]:
-        coordinates: defaultdict[data.Coordinates, Any] = defaultdict(list)
+    def coordinates_objects(self) -> defaultdict[data.Coordinates, typing.Any]:
+        coordinates: defaultdict[data.Coordinates, typing.Any] = defaultdict(list)
         for actor in self.extended_actors:
             coordinates[actor.coordinates].append(actor)
         for flag in self.game_state.flags:
@@ -139,7 +140,7 @@ class Objects:
 
 class Conditions:
     def __init__(self, objects: Objects):
-        self.objects = objects
+        self.objects: Objects = objects
 
     def we_have_the_flag(self, flag: FlagDescription):
         return any(
@@ -158,12 +159,12 @@ class State:
     def __init__(
         self, own_team: str, rules: RulesResponse, actions: AllActionsResponse
     ):
-        self.own_team = own_team
-        self.rules = rules
-        self.actions = actions.all_actions
+        self.own_team: str = own_team
+        self.rules: RulesResponse = rules
+        self.actions: dict[int, list[ActionDescription]] = actions.all_actions
         self.objects_dict: dict[int, Objects] = {}
         self.conditions_dict: dict[int, Conditions] = {}
-        self.tick = 0
+        self.tick: int = 0
 
     @property
     def objects(self) -> Objects:
