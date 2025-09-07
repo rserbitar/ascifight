@@ -1,31 +1,29 @@
 from abc import ABC, abstractmethod
+import typing
 import structlog
 from structlog.contextvars import (
     bound_contextvars,
 )
 
 import ascifight.board.data as asci_data
-import ascifight.client_lib.infra as asci_infra
-import ascifight.client_lib.metrics as asci_metrics
-import ascifight.client_lib.basic_functions as asci_basic
-import ascifight.client_lib.state as asci_state
-
-from ascifight.routers.states import (
-    FlagDescription,
-)
+import ascifight.client_lib.infra as client_infra
+import ascifight.client_lib.metrics as client_metrics
+import ascifight.client_lib.basic_functions as client_basic
+import ascifight.client_lib.state as client_state
+import ascifight.routers.states as asci_states
 
 
 class Agent(ABC):
-    def __init__(self, state: asci_state.State, ident: int) -> None:
-        self.state = state
-        self.objects = state.objects
-        self.rules = state.rules
-        self.conditions = state.conditions
-        self.me = self.objects.own_actor(ident)
-        self.properties = next(
+    def __init__(self, state: client_state.State, ident: int) -> None:
+        self.state: client_state.State = state
+        self.objects: client_state.Objects = state.objects
+        self.rules: asci_states.RulesResponse = state.rules
+        self.conditions: client_state.Conditions = state.conditions
+        self.me: client_state.ExtendedActorDescription = self.objects.own_actor(ident)
+        self.properties: asci_data.ActorProperty = next(
             prop for prop in self.rules.actor_properties if prop.type == self.me.type
         )
-        self._logger = structlog.get_logger()
+        self._logger: typing.Any = structlog.get_logger()
 
     def execute(self) -> None:
         with bound_contextvars(actor=self.me.ident):
@@ -35,7 +33,7 @@ class Agent(ABC):
     def _execute(self) -> None:
         pass
 
-    def bring_flag_home(self, metric: asci_metrics.Metric):
+    def bring_flag_home(self, metric: client_metrics.Metric):
         """
         Try to get back to the home base, using the given metric and place the flag
         on the home base.
@@ -53,18 +51,20 @@ class Agent(ABC):
             self._logger.info("No path!")
         elif home_base_distance > 1:
             self._logger.info("Heading home!")
-            asci_infra.issue_order(
+            client_infra.issue_order(
                 order="move", actor_id=self.me.ident, direction=home_base_direction
             )
         else:
             self._logger.info("Putting flag!")
-            asci_infra.issue_order(
+            client_infra.issue_order(
                 order="grabput",
                 actor_id=self.me.ident,
                 direction=home_base_direction,
             )
 
-    def get_flag(self, target_flag: FlagDescription, metric: asci_metrics.Metric):
+    def get_flag(
+        self, target_flag: asci_states.FlagDescription, metric: client_metrics.Metric
+    ):
         """
         Try to ge to the targeted flags using the supplied metric
         and grab it once within reach.
@@ -81,15 +81,15 @@ class Agent(ABC):
         # if distance is 2 it will be 1 after moving and thus can already be grabbed
         if flag_distance <= 2 and flag_direction is not None:
             self._logger.info("Grabbing flag!")
-            asci_infra.issue_order(
+            client_infra.issue_order(
                 order="grabput", actor_id=self.me.ident, direction=flag_direction
             )
 
     def attack(
         self,
-        target: asci_state.ExtendedActorDescription,
-        move_metric: asci_metrics.Metric,
-        target_metric: asci_metrics.Metric | None = None,
+        target: client_state.ExtendedActorDescription,
+        move_metric: client_metrics.Metric,
+        target_metric: client_metrics.Metric | None = None,
     ):
         """Try to move to the target using the supplied moving metric and
         then attack is using the supplied target metric."""
@@ -111,16 +111,16 @@ class Agent(ABC):
         else:
             if enemy_target_distance <= 3:
                 self._logger.info("Attacking!")
-                asci_infra.issue_order(
+                client_infra.issue_order(
                     order="attack",
                     actor_id=self.me.ident,
                     direction=enemy_target_direction,
                 )
 
-    def target_and_get_flag(self, metric: asci_metrics.Metric):
+    def target_and_get_flag(self, metric: client_metrics.Metric):
         # we dont have a flag
         if self.me.flag is None:
-            target_flag = asci_basic.nearest_enemy_flag(self.me, self.objects, metric)
+            target_flag = client_basic.nearest_enemy_flag(self.me, self.objects, metric)
 
             if self.conditions.we_have_the_flag(target_flag):
                 target_destination = self.objects.enemy_base(
@@ -134,7 +134,7 @@ class Agent(ABC):
             self.bring_flag_home(metric)
 
     def move_to_destination(
-        self, destination: asci_data.Coordinates, metric: asci_metrics.Metric
+        self, destination: asci_data.Coordinates, metric: client_metrics.Metric
     ):
         """
         Move to destination coordinates using the supplied metric.
@@ -147,7 +147,7 @@ class Agent(ABC):
         else:
             if destination_distance > 1:
                 self._logger.info("Heading for destination!")
-                asci_infra.issue_order(
+                client_infra.issue_order(
                     order="move",
                     actor_id=self.me.ident,
                     direction=destination_direction,
@@ -165,11 +165,12 @@ class NearestFlagRunner(Agent):
     * puts the flag ont he home base
     """
 
+    @typing.override
     def _execute(self) -> None:
-        avoid_attackers_weights = asci_metrics.WeightsGenerator(
+        avoid_attackers_weights = client_metrics.WeightsGenerator(
             self.state
         ).avoid_attackers()
-        avoid_killer_metric = asci_metrics.DijkstraMetric(
+        avoid_killer_metric = client_metrics.DijkstraMetric(
             self.state, weights=avoid_attackers_weights
         )
 
@@ -187,17 +188,18 @@ class AvoidCenterFlagRunner(Agent):
     * puts the flag ont he home base
     """
 
+    @typing.override
     def _execute(self) -> None:
-        avoid_attackers_weights = asci_metrics.WeightsGenerator(
+        avoid_attackers_weights = client_metrics.WeightsGenerator(
             self.state
         ).avoid_attackers()
         center = self.rules.map_size / 2 - 0.5
-        avoid_function = asci_metrics.gaussian_factory(5, self.rules.map_size / 3)
-        avoid_center_weights = asci_metrics.WeightsGenerator(
+        avoid_function = client_metrics.gaussian_factory(5, self.rules.map_size / 3)
+        avoid_center_weights = client_metrics.WeightsGenerator(
             self.state
         ).avoid_coordinates(center, center, avoid_function)
 
-        avoid_center_and_killer_metric = asci_metrics.DijkstraMetric(
+        avoid_center_and_killer_metric = client_metrics.DijkstraMetric(
             self.state, weights=avoid_attackers_weights + avoid_center_weights
         )
 
@@ -212,12 +214,13 @@ class NearestEnemyKiller(Agent):
     * runs to the next nearest enemy
     """
 
+    @typing.override
     def _execute(self) -> None:
-        blockers = asci_metrics.BlockersGenerator(self.state).standard_blockers(
+        blockers = client_metrics.BlockersGenerator(self.state).standard_blockers(
             blocking_enemy_actors=False
         )
-        metric = asci_metrics.DijkstraMetric(self.state, blockers=blockers)
-        target = asci_basic.nearest_enemy(self.me, self.objects, metric)
+        metric = client_metrics.DijkstraMetric(self.state, blockers=blockers)
+        target = client_basic.nearest_enemy(self.me, self.objects, metric)
         self.attack(target, metric)
 
 
@@ -230,20 +233,21 @@ class Defender(Agent):
     * runs to the next nearest enemy
     """
 
+    @typing.override
     def _execute(self) -> None:
-        blockers = asci_metrics.BlockersGenerator(self.state).standard_blockers(
+        blockers = client_metrics.BlockersGenerator(self.state).standard_blockers(
             blocking_enemy_actors=False
         )
         # create weights for a virtual fence around the base
-        defend_base_weights = asci_metrics.WeightsGenerator(self.state).guard_base()
+        defend_base_weights = client_metrics.WeightsGenerator(self.state).guard_base()
 
         # this metric will use weights to stop moving beyond a given distance
-        move_metric = asci_metrics.DijkstraMetric(
+        move_metric = client_metrics.DijkstraMetric(
             self.state, blockers=blockers, weights=defend_base_weights
         )
         # ths metric will be used for targeting to target and hit enemies
         # beyond/at the virtual move wall
 
-        target_metric = asci_metrics.DijkstraMetric(self.state, blockers=blockers)
-        target = asci_basic.nearest_enemy(self.me, self.objects, target_metric)
+        target_metric = client_metrics.DijkstraMetric(self.state, blockers=blockers)
+        target = client_basic.nearest_enemy(self.me, self.objects, target_metric)
         self.attack(target=target, move_metric=move_metric, target_metric=target_metric)
