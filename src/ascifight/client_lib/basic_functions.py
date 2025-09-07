@@ -1,4 +1,5 @@
-from typing import Sequence, TypeVar
+from typing import TypeVar
+from collections.abc import Sequence
 
 import ascifight.board.data as data
 from ascifight.routers.states import (
@@ -50,7 +51,7 @@ def get_nearest_coordinates(
     """
     Calculate the nearest coordinates from a set of coordinates to an origin coordinate.
     """
-    result = []
+    result: list[tuple[float, data.Coordinates]] = []
     for destination in destinations:
         dist = metric.path_distance(origin, destination)
         result.append((dist, destination))
@@ -62,16 +63,16 @@ T = TypeVar("T", asci_state.ExtendedActorDescription, FlagDescription, WallDescr
 
 
 def get_nearest_object(
-    origin_object: asci_state.ExtendedActorDescription
-    | FlagDescription
-    | WallDescription,
+    origin_object: (
+        asci_state.ExtendedActorDescription | FlagDescription | WallDescription
+    ),
     destination_objects: Sequence[T],
     metric: asci_metrics.Metric,
 ) -> T:
     """
     Calculate the nearest board object from a list of board objects to an origin object.
     """
-    result = []
+    result: list[tuple[float, T]] = []
     for destination_object in destination_objects:
         dist = metric.path_distance(
             origin_object.coordinates, destination_object.coordinates
