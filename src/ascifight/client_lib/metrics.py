@@ -1,11 +1,14 @@
 from abc import ABC, abstractmethod
 import math
+import typing
 from typing import Callable
 
 import structlog
 import numpy
 import numpy.typing as npt
 
+
+import ascifight.client_lib.state as asci_state
 from ascifight.board.data import Coordinates
 from ascifight.client_lib.state import State
 
@@ -35,6 +38,7 @@ def step_factory(border: float, inner: float, outer: float) -> Callable[[float],
     return step
 
 
+@typing.final
 class WeightsGenerator:
     def __init__(self, state: State):
         self.objects = state.objects
@@ -69,8 +73,10 @@ class WeightsGenerator:
 
     def avoid_attackers(
         self,
-        avoid_function: Callable[[float], float] = gaussian_factory(factor=3, sigma=2),
+        avoid_function: Callable[[float], float] | None = None,
     ) -> npt.NDArray[numpy.float16]:
+        if avoid_function is None:
+            avoid_function = gaussian_factory(factor=3, sigma=2)
         killer_coordinates = [
             actor.coordinates
             for actor in self.objects.enemy_actors
@@ -82,9 +88,9 @@ class WeightsGenerator:
         )
         return weights
 
-    def guard_base(self, radius=5) -> npt.NDArray[numpy.float16]:
+    def guard_base(self, radius: int = 5) -> npt.NDArray[numpy.float16]:
         home_base_coordinates = self.objects.home_base.coordinates
-        guard_function = step_factory(4, 0, math.inf)
+        guard_function = step_factory(radius, 0, math.inf)
         self._logger.debug("Guarding base.")
         weights = self._weights_for_coordinates(
             home_base_coordinates.x, home_base_coordinates.y, guard_function
@@ -97,6 +103,7 @@ class WeightsGenerator:
         return self._weights_for_coordinates(x, y, avoid_function)
 
 
+@typing.final
 class BlockersGenerator:
     def __init__(
         self,
@@ -134,15 +141,17 @@ class Metric(ABC):
         blockers: list[Coordinates] | None = None,
         weights: npt.NDArray[numpy.float16] | None = None,
     ):
-        self.state = state
-        self.objects = state.objects
-        self.map_size = state.rules.map_size
+        self.state: State = state
+        self.objects: asci_state.Objects = state.objects
+        self.map_size: int = state.rules.map_size
 
-        self.blockers = (
+        self.blockers: list[Coordinates] = (
             blockers if blockers else BlockersGenerator(self.state).standard_blockers()
         )
         ones = numpy.ones((self.map_size, self.map_size), dtype=numpy.float16)
-        self.weights = ones if weights is None else ones + weights
+        self.weights: npt.NDArray[numpy.float16] = (
+            ones if weights is None else ones + weights
+        )
 
         self.distance_fields: dict[Coordinates, dict[Coordinates, float]] = {}
         self.paths: dict[tuple[Coordinates, Coordinates], list[Coordinates]] = {}
@@ -247,6 +256,7 @@ class Metric(ABC):
 
 
 class BasicMetric(Metric):
+    @typing.override
     def _distance_field(self, origin: Coordinates) -> dict[Coordinates, float]:
         distance_field: dict[Coordinates, float] = {}
         for i in range(self.map_size):
@@ -281,7 +291,8 @@ class BasicMetric(Metric):
 
 
 class DijkstraMetric(Metric):
-    def __init__(self, *args, **kwargs) -> None:
+    @typing.override
+    def __init__(self, *args: typing.Any, **kwargs: dict[str, typing.Any]) -> None:
         super().__init__(*args, **kwargs)
         self.grid: dijkstra.GridWithWeights = dijkstra.GridWithWeights(
             height=self.map_size,
@@ -290,10 +301,12 @@ class DijkstraMetric(Metric):
             weights=self.weights,
         )
 
+    @typing.override
     def _distance_field(self, origin: Coordinates) -> dict[Coordinates, float]:
         _, distance_field = dijkstra.dijkstra_search(self.grid, origin, None)
         return distance_field
 
+    @typing.override
     def _path(self, origin: Coordinates, destination: Coordinates) -> list[Coordinates]:
         unblock_origin = False
         if origin in self.blockers:
