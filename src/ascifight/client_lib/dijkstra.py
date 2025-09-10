@@ -7,6 +7,7 @@
 from __future__ import annotations
 import heapq
 import math
+import typing
 
 import numpy
 import numpy.typing
@@ -22,10 +23,10 @@ class GridWithWeights:
         blockers: list[Coordinates] | None = None,
         weights: numpy.typing.NDArray[numpy.float16] | None = None,
     ):
-        self.width = width
-        self.height = height
-        self.blockers = blockers if blockers else []
-        self.weights = (
+        self.width: int = width
+        self.height: int = height
+        self.blockers: list[Coordinates] = blockers if blockers else []
+        self.weights: numpy.typing.NDArray[numpy.float16] = (
             weights
             if weights is not None
             else numpy.ones((height, width), dtype=numpy.float16)
@@ -34,12 +35,13 @@ class GridWithWeights:
     def passable(self, id: Coordinates) -> bool:
         return id not in self.blockers
 
-    def in_bounds(self, coordinates) -> bool:
-        x, y = coordinates
+    def in_bounds(self, coordinates: tuple[int, int]) -> bool:
+        x, y = coordinates[0], coordinates[1]
         return 0 <= x < self.width and 0 <= y < self.height
 
     def neighbors(self, id: Coordinates) -> filter[Coordinates]:
-        (x, y) = id.x, id.y
+        x: int = id.x
+        y: int = id.y
         coords = filter(
             self.in_bounds, [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
         )
@@ -99,7 +101,7 @@ def reconstruct_path(
     goal: Coordinates | None,
 ) -> list[Coordinates]:
     current = goal
-    path = []
+    path: list[Coordinates | None] = []
     if goal not in came_from:  # no path was found
         return []
     while current != start:
@@ -146,7 +148,7 @@ def a_star_search(graph: GridWithWeights, start: Coordinates, goal: Coordinates)
     return came_from, cost_so_far
 
 
-def draw_tile(graph: GridWithWeights, id: Coordinates, style):
+def draw_tile(graph: GridWithWeights, id: Coordinates, style: dict[str, typing.Any]):
     r = " . "
     if "number" in style and id in style["number"]:
         if style["number"][id] == math.inf:
@@ -175,7 +177,7 @@ def draw_tile(graph: GridWithWeights, id: Coordinates, style):
     return r
 
 
-def draw_grid(graph: GridWithWeights, **style):
+def draw_grid(graph: GridWithWeights, **style: typing.Any):
     print("___" * graph.width)
     for y in reversed(range(graph.height)):
         for x in range(graph.width):
