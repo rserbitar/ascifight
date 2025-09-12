@@ -292,7 +292,7 @@ class BasicMetric(Metric):
 
 class DijkstraMetric(Metric):
     @typing.override
-    def __init__(self, *args: typing.Any, **kwargs: dict[str, typing.Any]) -> None:
+    def __init__(self, *args: typing.Any, **kwargs: typing.Any) -> None:
         super().__init__(*args, **kwargs)
         self.grid: dijkstra.GridWithWeights = dijkstra.GridWithWeights(
             height=self.map_size,
