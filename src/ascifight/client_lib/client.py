@@ -1,42 +1,6 @@
-import httpx
-import time
-
-import structlog
-
-import ascifight.client_lib.state as asci_state
 import ascifight.client_lib.logic as logic
-import ascifight.client_lib.infra as asci_infra
-
-logger = structlog.get_logger()
-
-state: asci_state.State | None = None
-
-
-def game_loop():
-    global state
-    current_tick = -1
-    while True:
-        try:
-            timing = asci_infra.get_timing()
-            # if the game tarted a new tick we need to issue orders
-            if timing.tick != current_tick:
-                if timing.tick < current_tick:
-                    # the game may have restarted, reset tick
-                    current_tick = timing.tick
-                state = logic.execute(state)
-                current_tick = timing.tick
-                logger.info(f"Issued orders for tick {current_tick}.")
-            # sleep the time the server says it will take till next tick
-            sleep_duration_time = timing.time_to_next_execution
-            logger.info(f"sleeping for {sleep_duration_time} seconds.")
-            if sleep_duration_time >= 0:
-                time.sleep(sleep_duration_time)
-        except httpx.ConnectError:
-            logger.info("Server not started. Sleeping 5 seconds.")
-            current_tick = -1
-            time.sleep(5)
-            continue
+import ascifight.client_lib.game_loop as game_loop
 
 
 if __name__ == "__main__":
-    game_loop()
+    game_loop.game_loop(logic.execute)

@@ -10,9 +10,13 @@ import ascifight.client_lib.state as asci_state
 
 logger = structlog.get_logger()
 
+state: asci_state.State | None = None
 
-def execute(state: asci_state.State | None) -> asci_state.State:
+
+def execute() -> None:
     # necessary infrastructure here, do not change
+
+    global state
     state = asci_infra.update_state(state)
     bind_contextvars(tick=state.tick)
 
@@ -26,5 +30,3 @@ def execute(state: asci_state.State | None) -> asci_state.State:
     attacker.execute()
     guardian = asci_agents.Defender(state, ident=3)
     guardian.execute()
-
-    return state
