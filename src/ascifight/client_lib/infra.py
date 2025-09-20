@@ -4,7 +4,6 @@ import httpx
 import structlog
 import logging.config
 
-from ascifight.board.actions import Directions
 import ascifight.routers.states
 import ascifight.client_lib.state
 
@@ -131,10 +130,10 @@ def get_timing() -> ascifight.routers.states.TimingResponse:
     return ascifight.routers.states.TimingResponse.model_validate(response.json())
 
 
-def issue_order(order: str, actor_id: int, direction: Directions):
+def issue_order(order: str, actor_id: int, direction: str):
     httpx.post(
         url=f"{config['server']}orders/{order}/{actor_id}",
-        params={"direction": direction.value},
+        params={"direction": direction},
         auth=(config["team"], str(config["password"])),
     )
     logger.info("Sent order", order=order, actor=actor_id, direction=direction)
