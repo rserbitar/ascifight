@@ -52,14 +52,16 @@ class Agent(ABC):
         elif home_base_distance > 1:
             self._logger.info("Heading home!")
             client_infra.issue_order(
-                order="move", actor_id=self.me.ident, direction=home_base_direction
+                order="move",
+                actor_id=self.me.ident,
+                direction=home_base_direction.value,
             )
         else:
             self._logger.info("Putting flag!")
             client_infra.issue_order(
                 order="grabput",
                 actor_id=self.me.ident,
-                direction=home_base_direction,
+                direction=home_base_direction.value,
             )
 
     def get_flag(
@@ -82,7 +84,7 @@ class Agent(ABC):
         if flag_distance <= 2 and flag_direction is not None:
             self._logger.info("Grabbing flag!")
             client_infra.issue_order(
-                order="grabput", actor_id=self.me.ident, direction=flag_direction
+                order="grabput", actor_id=self.me.ident, direction=flag_direction.value
             )
 
     def attack(
@@ -114,7 +116,7 @@ class Agent(ABC):
                 client_infra.issue_order(
                     order="attack",
                     actor_id=self.me.ident,
-                    direction=enemy_target_direction,
+                    direction=enemy_target_direction.value,
                 )
 
     def target_and_get_flag(self, metric: client_metrics.Metric):
@@ -150,7 +152,7 @@ class Agent(ABC):
                 client_infra.issue_order(
                     order="move",
                     actor_id=self.me.ident,
-                    direction=destination_direction,
+                    direction=destination_direction.value,
                 )
 
 
