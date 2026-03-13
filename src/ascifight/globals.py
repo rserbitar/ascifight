@@ -1,6 +1,5 @@
-import datetime
 import asyncio
-
+import datetime
 
 import ascifight.game as game
 
