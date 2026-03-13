@@ -1,16 +1,15 @@
-from collections import defaultdict
-from pydantic import BaseModel, Field
 import typing
+from collections import defaultdict
+
 import structlog
+from pydantic import BaseModel, Field
 from structlog.contextvars import bind_contextvars, unbind_contextvars
 
-
-import ascifight.config as config
-import ascifight.util as util
+import ascifight.board.actions as asci_actions
 import ascifight.board.data as data
 import ascifight.board.setup as setup
-import ascifight.board.actions as asci_actions
-
+import ascifight.config as config
+import ascifight.util as util
 
 T = typing.TypeVar("T")
 

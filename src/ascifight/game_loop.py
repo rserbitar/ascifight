@@ -1,16 +1,16 @@
 import asyncio
-import importlib
 import datetime
-import os
+import importlib
 import logging
 import logging.handlers
+import os
 
 import structlog
 from structlog.contextvars import bind_contextvars
 
 import ascifight.config as config
-import ascifight.globals as globals
 import ascifight.game as game
+import ascifight.globals as globals
 
 root_logger = logging.getLogger()
 logger = structlog.get_logger()
