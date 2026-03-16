@@ -9,7 +9,8 @@ import ascifight.client_lib.state
 
 global config
 absolute_path = os.path.dirname(__file__)
-with open(file=f"{absolute_path}/client_config.toml", mode="r") as fp:
+config_file = os.environ.get("CLIENT_CONFIG", f"{absolute_path}/client_config.toml")
+with open(file=config_file, mode="r") as fp:
     config = toml.load(fp)
 
 try:
